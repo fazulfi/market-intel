@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env
+.env
+
+# Docker
+*.log
+pgdata/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
