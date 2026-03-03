@@ -27,3 +27,4 @@ Collector → DB → Signal Engine → Alerts
 v1.3.0
 
 Initial stable foundation release.
+# market-intel
