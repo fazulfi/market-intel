@@ -5,7 +5,6 @@ def _csv(name):
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 EXCHANGE = os.getenv("EXCHANGE", "bybit")
-
 SYMBOLS = _csv("SYMBOLS")
 TIMEFRAMES = _csv("TIMEFRAMES") or ["1m", "5m"]
 
@@ -34,13 +33,15 @@ DB_DSN = (
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# --- V1.4 ---
 ALERT_COOLDOWN_SEC = int(os.getenv("ALERT_COOLDOWN_SEC", 300))
-
-# --- V1.5 ---
 ENABLE_COMBO_ONLY = os.getenv("ENABLE_COMBO_ONLY", "true").lower() == "true"
 
 ATR_N = int(os.getenv("ATR_N", 14))
 ATR_WARMUP = int(os.getenv("ATR_WARMUP", 120))
 ATR_SL_MULT = float(os.getenv("ATR_SL_MULT", 1.0))
 RR_TP = float(os.getenv("RR_TP", 2.0))
+
+# --- V1.6 ---
+ENABLE_TRADES = os.getenv("ENABLE_TRADES", "true").lower() == "true"
+TRADE_MANAGER_INTERVAL_SEC = int(os.getenv("TRADE_MANAGER_INTERVAL_SEC", 5))
+CLOSE_RULE = os.getenv("CLOSE_RULE", "conservative").lower()
