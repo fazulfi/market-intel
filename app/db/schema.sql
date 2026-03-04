@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS signals (
   ts_ms BIGINT NOT NULL,
   signal_type TEXT NOT NULL,
   payload JSONB NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (exchange, symbol, timeframe, ts_ms, signal_type)
 );
 
 CREATE TABLE IF NOT EXISTS alerts (

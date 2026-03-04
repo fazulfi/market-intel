@@ -20,7 +20,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_shutdown)
     signal.signal(signal.SIGINT, handle_shutdown)
 
-    log("Market Intel V1.3 starting")
+    log("Market Intel V1.4 starting")
 
     repo = Repo()
     repo.init_schema()

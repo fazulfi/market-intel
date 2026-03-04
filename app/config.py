@@ -33,3 +33,9 @@ DB_DSN = (
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+VOL_SPIKE_K = float(os.getenv("VOL_SPIKE_K", 2.0))
+
+# --- V1.4 ---
+ALERT_COOLDOWN_SEC = int(os.getenv("ALERT_COOLDOWN_SEC", 300))
+ENABLE_COMBO_SIGNAL = os.getenv("ENABLE_COMBO_SIGNAL", "true").lower() == "true"
