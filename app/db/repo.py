@@ -62,11 +62,14 @@ class Repo:
     def insert_signal(self, exchange, symbol, tf, ts, stype, payload):
         sql = """
         INSERT INTO signals
-        (exchange,symbol,timeframe,ts_ms,signal_type,payload)
-        VALUES (%s,%s,%s,%s,%s,%s::jsonb);
+        (exchange, symbol, timeframe, ts_ms, signal_type, payload)
+        VALUES (%s,%s,%s,%s,%s,%s::jsonb)
+        ON CONFLICT (exchange, symbol, timeframe, ts_ms, signal_type)
+        DO NOTHING;
         """
         with self.pool.connection() as conn:
-            conn.execute(sql, (exchange, symbol, tf, ts, stype, json.dumps(payload)))
+            with conn.cursor() as cur:
+                cur.execute(sql, (exchange, symbol, tf, ts, stype, json.dumps(payload)))
 
     def fetch_new_signals(self, last_id):
         sql = """
