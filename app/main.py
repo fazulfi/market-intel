@@ -7,6 +7,7 @@ from app.services.collector import collect_loop
 from app.services.signals import signal_loop
 from app.services.alerts import alert_loop
 from app.services.backfill import run_backfill
+from app.services.trade_manager import trade_manager_loop
 from app.utils.heartbeat import heartbeat_loop
 from app.utils.logging import log
 
@@ -20,7 +21,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_shutdown)
     signal.signal(signal.SIGINT, handle_shutdown)
 
-    log("Market Intel V1.4 starting")
+    log("Market Intel V1.6 starting")
 
     repo = Repo()
     repo.init_schema()
@@ -29,10 +30,11 @@ def main():
     run_backfill(repo, ex)
 
     threads = [
-        threading.Thread(target=collect_loop, args=(repo, ex, shutdown_event)),
-        threading.Thread(target=signal_loop, args=(repo, shutdown_event)),
-        threading.Thread(target=alert_loop, args=(repo, shutdown_event)),
-        threading.Thread(target=heartbeat_loop, args=(shutdown_event,))
+        threading.Thread(target=collect_loop, args=(repo, ex, shutdown_event), daemon=True),
+        threading.Thread(target=signal_loop, args=(repo, shutdown_event), daemon=True),
+        threading.Thread(target=trade_manager_loop, args=(repo, shutdown_event), daemon=True),
+        threading.Thread(target=alert_loop, args=(repo, shutdown_event), daemon=True),
+        threading.Thread(target=heartbeat_loop, args=(shutdown_event,), daemon=True),
     ]
 
     for t in threads:
