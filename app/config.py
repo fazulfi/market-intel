@@ -76,3 +76,15 @@ def _parse_tf_map(raw: str):
     return out
 
 TREND_TF_MAP = _parse_tf_map(os.getenv("TREND_TF_MAP", "1m:5m,5m:15m,15m:1h"))
+
+# --- WS HYBRID ---
+ENABLE_WS_KLINES = os.getenv("ENABLE_WS_KLINES", "true").lower() == "true"
+ENABLE_REST_COLLECTOR = os.getenv("ENABLE_REST_COLLECTOR", "false").lower() == "true"
+BYBIT_WS_PUBLIC_URL = os.getenv("BYBIT_WS_PUBLIC_URL", "wss://stream.bybit.com/v5/public/linear")
+
+def _csv_fallback(name, fallback):
+    raw = os.getenv(name, "")
+    xs = [x.strip() for x in raw.split(",") if x.strip()]
+    return xs or fallback
+
+WS_KLINE_TIMEFRAMES = _csv_fallback("WS_KLINE_TIMEFRAMES", ["1m","5m","15m","1h","4h"])
