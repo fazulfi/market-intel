@@ -10,6 +10,7 @@ from app.services.backfill import run_backfill
 from app.services.trade_manager import trade_manager_loop
 from app.services.retest_manager import retest_manager_loop
 from app.services.summary import summary_loop
+from app.services.ws_ticker import start_ws_ticker
 from app.utils.heartbeat import heartbeat_loop
 from app.utils.logging import log
 
@@ -38,6 +39,7 @@ def main():
         threading.Thread(target=alert_loop, args=(repo, shutdown_event), daemon=True),
         threading.Thread(target=summary_loop, args=(repo, shutdown_event), daemon=True),
         threading.Thread(target=retest_manager_loop, args=(repo, shutdown_event), daemon=True),
+        threading.Thread(target=start_ws_ticker, args=(shutdown_event,), daemon=True),
         threading.Thread(target=heartbeat_loop, args=(shutdown_event,), daemon=True),
     ]
 

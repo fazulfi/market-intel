@@ -57,3 +57,22 @@ EMA_TREND_TF = os.getenv("EMA_TREND_TF", "15m")
 ENABLE_RETEST = os.getenv("ENABLE_RETEST", "true").lower() == "true"
 RETEST_MAX_BARS = int(os.getenv("RETEST_MAX_BARS", 6))
 RETEST_TOUCH_MODE = os.getenv("RETEST_TOUCH_MODE", "wick").lower()
+
+# --- V1.9 WS + TF MAP ---
+ENABLE_WS_TICKER = os.getenv("ENABLE_WS_TICKER", "true").lower() == "true"
+WS_MARKET_TYPE = os.getenv("WS_MARKET_TYPE", "linear").lower()
+WS_PING_SEC = int(os.getenv("WS_PING_SEC", 20))
+WS_RECONNECT_SEC = int(os.getenv("WS_RECONNECT_SEC", 3))
+
+def _parse_tf_map(raw: str):
+    # format: "1m:5m,5m:15m,15m:1h"
+    out = {}
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part or ":" not in part:
+            continue
+        k, v = part.split(":", 1)
+        out[k.strip()] = v.strip()
+    return out
+
+TREND_TF_MAP = _parse_tf_map(os.getenv("TREND_TF_MAP", "1m:5m,5m:15m,15m:1h"))
