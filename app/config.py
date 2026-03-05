@@ -45,3 +45,15 @@ RR_TP = float(os.getenv("RR_TP", 2.0))
 ENABLE_TRADES = os.getenv("ENABLE_TRADES", "true").lower() == "true"
 TRADE_MANAGER_INTERVAL_SEC = int(os.getenv("TRADE_MANAGER_INTERVAL_SEC", 5))
 CLOSE_RULE = os.getenv("CLOSE_RULE", "conservative").lower()
+
+# --- V1.7 SUMMARY FIX ---
+SUMMARY_HOURLY_MINUTE = int(os.getenv("SUMMARY_HOURLY_MINUTE", "0"))
+SUMMARY_DAILY_HOUR = int(os.getenv("SUMMARY_DAILY_HOUR", "0"))
+SUMMARY_DAILY_MINUTE = int(os.getenv("SUMMARY_DAILY_MINUTE", "5"))
+
+# --- V1.8 EMA + RETEST ---
+EMA_TREND_N = int(os.getenv("EMA_TREND_N", 200))
+EMA_TREND_TF = os.getenv("EMA_TREND_TF", "15m")
+ENABLE_RETEST = os.getenv("ENABLE_RETEST", "true").lower() == "true"
+RETEST_MAX_BARS = int(os.getenv("RETEST_MAX_BARS", 6))
+RETEST_TOUCH_MODE = os.getenv("RETEST_TOUCH_MODE", "wick").lower()
