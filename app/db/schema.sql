@@ -59,3 +59,25 @@ CREATE TABLE IF NOT EXISTS trades (
 
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_trade_per_pair ON trades(exchange, symbol, timeframe) WHERE status = 'OPEN';
 CREATE INDEX IF NOT EXISTS trades_lookup ON trades(exchange, symbol, timeframe, status);
+
+
+-- --- V1.8 TRADE SETUPS ---
+CREATE TABLE IF NOT EXISTS trade_setups (
+  id BIGSERIAL PRIMARY KEY,
+  exchange TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  timeframe TEXT NOT NULL,
+  side TEXT NOT NULL,                -- LONG/SHORT
+  status TEXT NOT NULL,              -- PENDING/TRIGGERED/EXPIRED/CANCELLED
+  created_ts_ms BIGINT NOT NULL,
+  expires_ts_ms BIGINT NOT NULL,
+  level DOUBLE PRECISION NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ✅ Only 1 pending setup per pair (NO BOM WAKTU)
+CREATE UNIQUE INDEX IF NOT EXISTS one_pending_setup_per_pair
+ON trade_setups(exchange, symbol, timeframe)
+WHERE status = 'PENDING';

@@ -50,3 +50,10 @@ CLOSE_RULE = os.getenv("CLOSE_RULE", "conservative").lower()
 SUMMARY_HOURLY_MINUTE = int(os.getenv("SUMMARY_HOURLY_MINUTE", "0"))
 SUMMARY_DAILY_HOUR = int(os.getenv("SUMMARY_DAILY_HOUR", "0"))
 SUMMARY_DAILY_MINUTE = int(os.getenv("SUMMARY_DAILY_MINUTE", "5"))
+
+# --- V1.8 EMA + RETEST ---
+EMA_TREND_N = int(os.getenv("EMA_TREND_N", 200))
+EMA_TREND_TF = os.getenv("EMA_TREND_TF", "15m")
+ENABLE_RETEST = os.getenv("ENABLE_RETEST", "true").lower() == "true"
+RETEST_MAX_BARS = int(os.getenv("RETEST_MAX_BARS", 6))
+RETEST_TOUCH_MODE = os.getenv("RETEST_TOUCH_MODE", "wick").lower()

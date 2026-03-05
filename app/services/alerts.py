@@ -77,6 +77,18 @@ def alert_loop(repo, shutdown_event):
                     if vol_mult:
                         msg += f"\n💥 Vol Spike: {vol_mult}x"
 
+                elif "SETUP" in st:
+                    icon = "⏳"
+                    side = "LONG" if "LONG" in st else "SHORT"
+                    level = _safe_float(p.get("level"))
+                    ema200 = _safe_float(p.get("ema200"))
+                    
+                    msg = f"{icon} <b>SETUP DETECTED ({side})</b>\n{r['symbol']} ({r['timeframe']}) - Waiting Retest"
+                    if level is not None:
+                        msg += f"\nBreakout Level: {level:.4f}"
+                    if ema200 is not None:
+                        msg += f"\nEMA200 Trend: {ema200:.4f}"
+    
                 elif "CLOSE" in st:
                     icon = "🏆" if "TP" in st else "💔"
                     side = (p.get("side") or "UNKNOWN").upper()
