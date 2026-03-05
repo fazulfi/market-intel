@@ -45,3 +45,8 @@ RR_TP = float(os.getenv("RR_TP", 2.0))
 ENABLE_TRADES = os.getenv("ENABLE_TRADES", "true").lower() == "true"
 TRADE_MANAGER_INTERVAL_SEC = int(os.getenv("TRADE_MANAGER_INTERVAL_SEC", 5))
 CLOSE_RULE = os.getenv("CLOSE_RULE", "conservative").lower()
+
+# --- V1.7 SUMMARY FIX ---
+SUMMARY_HOURLY_MINUTE = int(os.getenv("SUMMARY_HOURLY_MINUTE", "0"))
+SUMMARY_DAILY_HOUR = int(os.getenv("SUMMARY_DAILY_HOUR", "0"))
+SUMMARY_DAILY_MINUTE = int(os.getenv("SUMMARY_DAILY_MINUTE", "5"))

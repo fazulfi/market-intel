@@ -103,3 +103,42 @@ class Repo:
         with self.pool.connection() as conn:
             rows = conn.execute(sql).fetchall()
             return [dict(r) for r in rows]
+
+    # --- V1.7 SUMMARY METHODS ---
+    def fetch_open_trades_count(self):
+        sql = "SELECT COUNT(*) AS open_count FROM trades WHERE status='OPEN';"
+        with self.pool.connection() as conn:
+            row = conn.execute(sql).fetchone()
+            return int(row["open_count"]) if row else 0
+
+    def fetch_trade_stats_window(self, seconds: int):
+        # Hitung PnL dinamis dari close_price dan entry (kolom pnl_pct tidak wajib ada)
+        sql = """
+        SELECT
+          COUNT(*) FILTER (WHERE status='CLOSED') AS closed,
+          COUNT(*) FILTER (WHERE status='CLOSED' AND (
+              (side='LONG' AND close_price > entry) OR
+              (side='SHORT' AND close_price < entry)
+          )) AS wins,
+          COUNT(*) FILTER (WHERE status='CLOSED' AND (
+              (side='LONG' AND close_price <= entry) OR
+              (side='SHORT' AND close_price >= entry)
+          )) AS losses,
+          COALESCE(AVG(
+              CASE
+                  WHEN side='LONG' THEN (close_price - entry) / entry * 100.0
+                  WHEN side='SHORT' THEN (entry - close_price) / entry * 100.0
+              END
+          ) FILTER (WHERE status='CLOSED'), 0) AS avg_pnl,
+          COALESCE(SUM(
+              CASE
+                  WHEN side='LONG' THEN (close_price - entry) / entry * 100.0
+                  WHEN side='SHORT' THEN (entry - close_price) / entry * 100.0
+              END
+          ) FILTER (WHERE status='CLOSED'), 0) AS sum_pnl
+        FROM trades
+        WHERE closed_at >= now() - (%s || ' seconds')::interval;
+        """
+        with self.pool.connection() as conn:
+            row = conn.execute(sql, (seconds,)).fetchone()
+            return dict(row) if row else {}
