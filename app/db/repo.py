@@ -236,3 +236,23 @@ class Repo:
         with self.pool.connection() as conn:
             row = conn.execute(sql, (exchange, symbol, tf, int(cooldown_sec))).fetchone()
             return bool(row)
+
+    # --- V2.3.1 POST-CLOSE COOLDOWN BY BARS ---
+    def has_recent_closed_trade_bars(self, exchange, symbol, tf, current_ts_ms: int, cooldown_bars: int):
+        tf_sec = {"1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400}
+        sec = tf_sec.get(tf, 60)
+        lookback_ms = int(cooldown_bars) * sec * 1000
+
+        sql = '''
+        SELECT 1
+        FROM trades
+        WHERE exchange=%s
+          AND symbol=%s
+          AND timeframe=%s
+          AND status='CLOSED'
+          AND closed_ts_ms >= %s
+        LIMIT 1;
+        '''
+        with self.pool.connection() as conn:
+            row = conn.execute(sql, (exchange, symbol, tf, int(current_ts_ms - lookback_ms))).fetchone()
+            return bool(row)

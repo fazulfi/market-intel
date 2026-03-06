@@ -101,7 +101,7 @@ def signal_loop(repo, shutdown_event):
                         continue
 
                     # cooldown ONLY after close
-                    if repo.has_recent_closed_trade(EXCHANGE, s, tf, POST_CLOSE_COOLDOWN_SEC):
+                    if repo.has_recent_closed_trade_bars(EXCHANGE, s, tf, ts, POST_CLOSE_COOLDOWN_BARS):
                         continue
 
                     if breakout_long and vol_spike and trend_up:

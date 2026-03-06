@@ -97,3 +97,6 @@ ENABLE_ENTRY2 = os.getenv("ENABLE_ENTRY2", "true").lower() == "true"
 ENTRY2_ATR_MULT = float(os.getenv("ENTRY2_ATR_MULT", 1.0))
 
 POST_CLOSE_COOLDOWN_SEC = int(os.getenv("POST_CLOSE_COOLDOWN_SEC", 300))
+
+# --- V2.3.1 POST-CLOSE COOLDOWN BY BARS ---
+POST_CLOSE_COOLDOWN_BARS = int(os.getenv("POST_CLOSE_COOLDOWN_BARS", 2))
