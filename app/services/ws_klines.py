@@ -54,6 +54,7 @@ async def klines_loop(shutdown_event):
                         if k.get("confirm") is not True: continue
 
                         ts_ms = int(k.get("start") or k.get("t") or 0)
+                        if not ts_ms: continue
                         if ts_ms < 10_000_000_000: ts_ms *= 1000
 
                         try:
