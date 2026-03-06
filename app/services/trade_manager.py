@@ -42,7 +42,7 @@ def trade_manager_loop(repo, shutdown_event):
 
                 # 2) FALLBACK: candle hi/lo (kalau WS putus / belum dapet tick)
                 if reason is None:
-                    candles = repo.get_recent_candles(ex, s, tf, 2)
+                    candles = repo.get_recent_candles(ex, s, '1m', 2)
                     if not candles:
                         continue
                     last = candles[-1]

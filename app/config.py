@@ -75,7 +75,8 @@ def _parse_tf_map(raw: str):
         out[k.strip()] = v.strip()
     return out
 
-TREND_TF_MAP = _parse_tf_map(os.getenv("TREND_TF_MAP", "1m:5m,5m:15m,15m:1h"))
+TREND_TF_MAP = _parse_tf_map(os.getenv("TREND_TF_MAP", "1m:15m,5m:1h,15m:4h"))
+ATR_TF_MAP = _parse_tf_map(os.getenv("ATR_TF_MAP", "1m:5m,5m:15m,15m:1h"))
 
 # --- WS HYBRID ---
 ENABLE_WS_KLINES = os.getenv("ENABLE_WS_KLINES", "true").lower() == "true"

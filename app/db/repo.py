@@ -147,28 +147,19 @@ class Repo:
     # --- V1.8 SETUP METHODS (partial index safe) ---
     def upsert_setup_pending(self, exchange, symbol, tf, side, created_ts_ms, expires_ts_ms, level, payload: dict):
         import json
+        sql = '''
+        INSERT INTO trade_setups (exchange, symbol, timeframe, side, status, created_ts_ms, expires_ts_ms, level, payload)
+        VALUES (%s,%s,%s,%s,'PENDING',%s,%s,%s,%s::jsonb)
+        ON CONFLICT (exchange, symbol, timeframe) WHERE status = 'PENDING'
+        DO UPDATE SET
+            side = EXCLUDED.side, created_ts_ms = EXCLUDED.created_ts_ms,
+            expires_ts_ms = EXCLUDED.expires_ts_ms, level = EXCLUDED.level,
+            payload = EXCLUDED.payload, updated_at = now()
+        RETURNING id;
+        '''
         with self.pool.connection() as conn:
-            # 1. Cek dulu apakah ada (Bukan Try-Except)
-            check_sql = "SELECT id FROM trade_setups WHERE exchange=%s AND symbol=%s AND timeframe=%s AND status='PENDING';"
-            row = conn.execute(check_sql, (exchange, symbol, tf)).fetchone()
-            
-            if row:
-                # 2. Kalau ada, UPDATE
-                update_sql = '''
-                UPDATE trade_setups
-                SET side=%s, created_ts_ms=%s, expires_ts_ms=%s, level=%s, payload=%s::jsonb, updated_at=now()
-                WHERE id=%s RETURNING id;
-                '''
-                r = conn.execute(update_sql, (side, int(created_ts_ms), int(expires_ts_ms), float(level), json.dumps(payload), row["id"])).fetchone()
-                return r["id"] if r else None
-            else:
-                # 3. Kalau belum ada, INSERT
-                insert_sql = '''
-                INSERT INTO trade_setups (exchange, symbol, timeframe, side, status, created_ts_ms, expires_ts_ms, level, payload)
-                VALUES (%s,%s,%s,%s,'PENDING',%s,%s,%s,%s::jsonb) RETURNING id;
-                '''
-                r = conn.execute(insert_sql, (exchange, symbol, tf, side, int(created_ts_ms), int(expires_ts_ms), float(level), json.dumps(payload))).fetchone()
-                return r["id"] if r else None
+            r = conn.execute(sql, (exchange, symbol, tf, side, int(created_ts_ms), int(expires_ts_ms), float(level), json.dumps(payload))).fetchone()
+            return r["id"] if r else None
 
     def list_pending_setups(self):
         sql = "SELECT * FROM trade_setups WHERE status='PENDING' ORDER BY id ASC;"
