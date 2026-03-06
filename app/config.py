@@ -109,3 +109,6 @@ SL_ATR_MULT = float(os.getenv("SL_ATR_MULT", 2.0))
 ENTRY1_ATR_OFFSET = float(os.getenv("ENTRY1_ATR_OFFSET", 0.0))
 ENTRY2_ATR_OFFSET = float(os.getenv("ENTRY2_ATR_OFFSET", 1.0))
 SETUP_EXPIRY_BARS = int(os.getenv("SETUP_EXPIRY_BARS", 12))
+
+# --- V2.4.1 ENTRY1 CHASE ---
+ENTRY1_CHASE_ATR_PCT = float(os.getenv("ENTRY1_CHASE_ATR_PCT", 0.25))
