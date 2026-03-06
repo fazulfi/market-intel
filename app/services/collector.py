@@ -3,11 +3,11 @@ from app.utils.logging import log
 from app.utils.logging import log_error
 
 def collect_loop(repo, ex, shutdown_event):
+    if not ENABLE_REST_COLLECTOR:
+        log("REST Collector disabled (WS mode ON)")
+        return
+        
     while not shutdown_event.is_set():
-        if not ENABLE_REST_COLLECTOR:
-            log("REST Collector disabled (WS mode ON)")
-            shutdown_event.wait(COLLECTOR_INTERVAL_SEC)
-            continue
 
         try:
             for s in SYMBOLS:
