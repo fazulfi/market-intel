@@ -3,17 +3,17 @@ from app.config import *
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 
-_TF_SEC = {"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"4h":14400,"1d":86400}
 def _smallest_tf(timeframes):
-    xs = [tf for tf in (timeframes or []) if tf in _TF_SEC]
-    return min(xs, key=lambda t: _TF_SEC[t]) if xs else "1m"
-
+    tf_sec = {"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"4h":14400,"1d":86400}
+    xs = [tf for tf in (timeframes or []) if tf in tf_sec]
+    return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def trade_manager_loop(repo, shutdown_event):
     if not ENABLE_TRADES:
         return
 
-    log("TradeManager V1.9 (WS-first, REST fallback) starting")
+    log("TradeManager V2.3 starting")
+    fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
         try:
@@ -31,7 +31,6 @@ def trade_manager_loop(repo, shutdown_event):
                 close_price = None
                 ts = None
 
-                # 1) FAST: WS tick
                 tick_px = get_tick(s)
                 if tick_px is not None:
                     if side == "LONG":
@@ -46,14 +45,13 @@ def trade_manager_loop(repo, shutdown_event):
                             reason, close_price = "SL", tick_px
                     ts = int(time.time() * 1000)
 
-                # 2) FALLBACK: candle hi/lo (kalau WS putus / belum dapet tick)
                 if reason is None:
-                    candles = repo.get_recent_candles(ex, s, _smallest_tf(TIMEFRAMES), 2)
+                    candles = repo.get_recent_candles(ex, s, fallback_tf, 2)
                     if not candles:
                         continue
-                    last = candles[-1]
-                    hi, lo = float(last["high"]), float(last["low"])
-                    ts = int(last["ts_ms"])
+                    hi = float(candles[-1]["high"])
+                    lo = float(candles[-1]["low"])
+                    ts = int(candles[-1]["ts_ms"])
 
                     if side == "LONG":
                         if hi >= tp and lo <= sl:
@@ -72,12 +70,14 @@ def trade_manager_loop(repo, shutdown_event):
 
                 if reason and close_price is not None and ts is not None:
                     if repo.close_trade(trade_id, ts, float(close_price), reason):
+                        ref_entry = float(t.get("avg_entry") or t.get("entry") or 0)
                         payload = {
                             "trade_id": trade_id,
                             "side": side,
-                            "entry": float(t["entry"]),
+                            "entry": ref_entry,
                             "close_price": float(close_price),
                             "close_reason": reason,
+                            "filled_entry2": bool(t.get("filled_entry2")),
                             "ws_tick": bool(tick_px is not None),
                         }
                         stype = "CLOSE_TP" if reason == "TP" else "CLOSE_SL"

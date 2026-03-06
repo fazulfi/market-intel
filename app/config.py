@@ -89,3 +89,11 @@ def _csv_fallback(name, fallback):
     return xs or fallback
 
 WS_KLINE_TIMEFRAMES = _csv_fallback("WS_KLINE_TIMEFRAMES", ["1m","5m","15m","1h","4h"])
+
+# --- V2.3 TWO-STEP ENTRY ---
+ENTRY1_SIZE = float(os.getenv("ENTRY1_SIZE", 0.30))
+ENTRY2_SIZE = float(os.getenv("ENTRY2_SIZE", 0.70))
+ENABLE_ENTRY2 = os.getenv("ENABLE_ENTRY2", "true").lower() == "true"
+ENTRY2_ATR_MULT = float(os.getenv("ENTRY2_ATR_MULT", 1.0))
+
+POST_CLOSE_COOLDOWN_SEC = int(os.getenv("POST_CLOSE_COOLDOWN_SEC", 300))

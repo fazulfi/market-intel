@@ -8,7 +8,7 @@ from app.services.signals import signal_loop
 from app.services.alerts import alert_loop
 from app.services.backfill import run_backfill
 from app.services.trade_manager import trade_manager_loop
-from app.services.retest_manager import retest_manager_loop
+from app.services.entry_manager import entry_manager_loop
 from app.services.summary import summary_loop
 from app.services.ws_ticker import start_ws_ticker
 from app.services.ws_klines import start_ws_klines
@@ -36,11 +36,11 @@ def main():
     threads = [
         threading.Thread(target=collect_loop, args=(repo, ex, shutdown_event), daemon=True),
         threading.Thread(target=signal_loop, args=(repo, shutdown_event), daemon=True),
+        threading.Thread(target=entry_manager_loop, args=(repo, shutdown_event), daemon=True),
         threading.Thread(target=trade_manager_loop, args=(repo, shutdown_event), daemon=True),
         threading.Thread(target=alert_loop, args=(repo, shutdown_event), daemon=True),
         threading.Thread(target=summary_loop, args=(repo, shutdown_event), daemon=True),
-        threading.Thread(target=retest_manager_loop, args=(repo, shutdown_event), daemon=True),
-        threading.Thread(target=start_ws_klines, args=(shutdown_event,), daemon=True),
+                threading.Thread(target=start_ws_klines, args=(shutdown_event,), daemon=True),
         threading.Thread(target=start_ws_ticker, args=(shutdown_event,), daemon=True),
         threading.Thread(target=heartbeat_loop, args=(shutdown_event,), daemon=True),
     ]

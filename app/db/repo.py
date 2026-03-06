@@ -176,3 +176,63 @@ class Repo:
         sql = "UPDATE trade_setups SET status='EXPIRED', updated_at=now() WHERE id=%s AND status='PENDING' RETURNING id;"
         with self.pool.connection() as conn:
             return bool(conn.execute(sql, (int(setup_id),)).fetchone())
+
+
+    # --- V2.3 TWO-STEP ENTRY ---
+    def open_trade_two_step(self, exchange, symbol, tf, side, opened_ts_ms, payload: dict):
+        sql = '''
+        INSERT INTO trades (
+            exchange, symbol, timeframe, side, status, opened_ts_ms,
+            entry, tp, sl, atr14, vol_mult, level,
+            entry1, entry2, entry1_size, entry2_size, filled_entry2, avg_entry
+        )
+        VALUES (%s,%s,%s,%s,'OPEN',%s,
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s)
+        ON CONFLICT DO NOTHING
+        RETURNING id;
+        '''
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, (
+                exchange, symbol, tf, side, int(opened_ts_ms),
+                float(payload["entry"]), float(payload["tp"]), float(payload["sl"]),
+                float(payload.get("atr14")) if payload.get("atr14") is not None else None,
+                float(payload.get("vol_mult")) if payload.get("vol_mult") is not None else None,
+                float(payload.get("level")) if payload.get("level") is not None else None,
+                float(payload.get("entry1")) if payload.get("entry1") is not None else None,
+                float(payload.get("entry2")) if payload.get("entry2") is not None else None,
+                float(payload.get("entry1_size")) if payload.get("entry1_size") is not None else None,
+                float(payload.get("entry2_size")) if payload.get("entry2_size") is not None else None,
+                bool(payload.get("filled_entry2", False)),
+                float(payload.get("avg_entry")) if payload.get("avg_entry") is not None else None,
+            )).fetchone()
+            return r["id"] if r else None
+
+    def mark_entry2_filled(self, trade_id: int, entry2_price: float, avg_entry: float):
+        sql = '''
+        UPDATE trades
+        SET filled_entry2 = true,
+            avg_entry = %s,
+            entry = %s,
+            updated_at = now()
+        WHERE id = %s AND status = 'OPEN' AND filled_entry2 = false
+        RETURNING id;
+        '''
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, (float(avg_entry), float(avg_entry), int(trade_id))).fetchone()
+            return bool(r)
+
+    def has_recent_closed_trade(self, exchange, symbol, tf, cooldown_sec: int):
+        sql = '''
+        SELECT 1
+        FROM trades
+        WHERE exchange=%s
+          AND symbol=%s
+          AND timeframe=%s
+          AND status='CLOSED'
+          AND closed_at >= now() - (%s || ' seconds')::interval
+        LIMIT 1;
+        '''
+        with self.pool.connection() as conn:
+            row = conn.execute(sql, (exchange, symbol, tf, int(cooldown_sec))).fetchone()
+            return bool(row)
