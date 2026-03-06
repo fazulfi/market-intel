@@ -28,8 +28,11 @@ async def klines_loop(shutdown_event):
     while not shutdown_event.is_set():
         try:
             async with websockets.connect(BYBIT_WS_PUBLIC_URL, ping_interval=20) as ws:
-                await ws.send(json.dumps(sub_msg))
-                log("WS_KLINES subscribed")
+                for i in range(0, len(topics), 25):
+                    await ws.send(json.dumps({"op": "subscribe", "args": topics[i:i+25]}))
+                    import asyncio
+                    await asyncio.sleep(0.1)
+                log(f"WS_KLINES subscribed to {len(topics)} topics in batches")
 
                 while not shutdown_event.is_set():
                     raw = await ws.recv()
