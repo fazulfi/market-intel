@@ -100,3 +100,12 @@ POST_CLOSE_COOLDOWN_SEC = int(os.getenv("POST_CLOSE_COOLDOWN_SEC", 300))
 
 # --- V2.3.1 POST-CLOSE COOLDOWN BY BARS ---
 POST_CLOSE_COOLDOWN_BARS = int(os.getenv("POST_CLOSE_COOLDOWN_BARS", 2))
+
+# --- V2.4 LAYERED SETUP ---
+TP1_ATR_MULT = float(os.getenv("TP1_ATR_MULT", 1.0))
+TP2_ATR_MULT = float(os.getenv("TP2_ATR_MULT", 1.8))
+TP3_ATR_MULT = float(os.getenv("TP3_ATR_MULT", 2.4))
+SL_ATR_MULT = float(os.getenv("SL_ATR_MULT", 2.0))
+ENTRY1_ATR_OFFSET = float(os.getenv("ENTRY1_ATR_OFFSET", 0.0))
+ENTRY2_ATR_OFFSET = float(os.getenv("ENTRY2_ATR_OFFSET", 1.0))
+SETUP_EXPIRY_BARS = int(os.getenv("SETUP_EXPIRY_BARS", 12))

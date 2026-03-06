@@ -256,3 +256,52 @@ class Repo:
         with self.pool.connection() as conn:
             row = conn.execute(sql, (exchange, symbol, tf, int(current_ts_ms - lookback_ms))).fetchone()
             return bool(row)
+
+    # --- V2.4 LAYERED SETUP ---
+    def create_layered_setup(self, exchange, symbol, tf, side, created_ts_ms, expires_ts_ms, payload: dict):
+        sql = '''
+        INSERT INTO trade_setups (
+            exchange, symbol, timeframe, side, status, created_ts_ms, expires_ts_ms, level, payload,
+            entry1, entry2, sl, tp1, tp2, tp3, atr14, filled_entry1, filled_entry2, avg_entry, entry1_size, entry2_size, updated_at
+        ) VALUES (
+            %s,%s,%s,%s,'PENDING',%s,%s,%s,%s::jsonb,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now()
+        )
+        ON CONFLICT (exchange, symbol, timeframe) WHERE status='PENDING'
+        DO UPDATE SET
+            side=EXCLUDED.side, expires_ts_ms=EXCLUDED.expires_ts_ms, level=EXCLUDED.level, payload=EXCLUDED.payload,
+            entry1=EXCLUDED.entry1, entry2=EXCLUDED.entry2, sl=EXCLUDED.sl, tp1=EXCLUDED.tp1, tp2=EXCLUDED.tp2, tp3=EXCLUDED.tp3,
+            atr14=EXCLUDED.atr14, entry1_size=EXCLUDED.entry1_size, entry2_size=EXCLUDED.entry2_size, updated_at=now()
+        RETURNING id;
+        '''
+        import json
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, (
+                exchange, symbol, tf, side, int(created_ts_ms), int(expires_ts_ms), float(payload["level"]), json.dumps(payload),
+                float(payload["entry1"]), float(payload["entry2"]), float(payload["sl"]), float(payload["tp1"]),
+                float(payload["tp2"]), float(payload["tp3"]), float(payload["atr14"]), False, False, 
+                float(payload["entry1"]), float(payload["entry1_size"]), float(payload["entry2_size"])
+            )).fetchone()
+            return r["id"] if r else None
+
+    def open_trade_from_setup(self, setup: dict, opened_ts_ms: int):
+        sql = '''
+        INSERT INTO trades (
+            exchange, symbol, timeframe, side, status, opened_ts_ms, entry, tp, sl, atr14, vol_mult, level,
+            entry1, entry2, entry1_size, entry2_size, filled_entry2, avg_entry, updated_at
+        ) VALUES (
+            %s,%s,%s,%s,'OPEN',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now()
+        ) ON CONFLICT DO NOTHING RETURNING id;
+        '''
+        import json
+        p = setup.get("payload", {})
+        if isinstance(p, str): p = json.loads(p)
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, (
+                setup["exchange"], setup["symbol"], setup["timeframe"], setup["side"], int(opened_ts_ms),
+                float(setup.get("avg_entry", setup["entry1"])), float(setup["tp3"]), float(setup["sl"]), float(setup["atr14"]),
+                float(p.get("vol_mult")) if p.get("vol_mult") else None, float(setup["level"]),
+                float(setup["entry1"]), float(setup["entry2"]), float(setup["entry1_size"]), float(setup["entry2_size"]),
+                False, float(setup["entry1"])
+            )).fetchone()
+            return r["id"] if r else None

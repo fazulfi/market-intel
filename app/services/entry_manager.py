@@ -3,61 +3,61 @@ from app.config import *
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 
-def _calc_avg_entry(entry1, size1, entry2, size2):
-    total = size1 + size2
-    return ((entry1 * size1) + (entry2 * size2)) / total if total > 0 else entry1
-
+def _calc_avg_entry(e1, s1, e2, s2): return ((e1 * s1) + (e2 * s2)) / (s1 + s2) if (s1 + s2) > 0 else e1
 def _smallest_tf(timeframes):
     tf_sec = {"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"4h":14400,"1d":86400}
     xs = [tf for tf in (timeframes or []) if tf in tf_sec]
     return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def entry_manager_loop(repo, shutdown_event):
-    log("EntryManager V2.3 starting")
+    log("EntryManager V2.4 starting")
     fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
         try:
-            trades = repo.list_open_trades()
-            if not trades:
-                shutdown_event.wait(1)
-                continue
-
-            for t in trades:
-                if t.get("filled_entry2") or t.get("entry2") is None:
+            now_ms = int(time.time() * 1000)
+            
+            # 1. Pengecekan ENTRY 1 (Dari SETUP PENDING)
+            for st in repo.list_pending_setups():
+                if now_ms > int(st["expires_ts_ms"]):
+                    repo.mark_setup_expired(int(st["id"]))
                     continue
+                
+                ex, s, tf, side = st["exchange"], st["symbol"], st["timeframe"], st["side"]
+                tick = get_tick(s)
+                if tick is None:
+                    c = repo.get_recent_candles(ex, s, fallback_tf, 2)
+                    if not c: continue
+                    low, high, last_ts = float(c[-1]["low"]), float(c[-1]["high"]), int(c[-1]["ts_ms"])
+                else: low = high = float(tick); last_ts = now_ms
+                
+                entry1 = float(st["entry1"])
+                if (low <= entry1 if side == "LONG" else high >= entry1) and not repo.get_open_trade(ex, s, tf):
+                    trade_id = repo.open_trade_from_setup(st, last_ts)
+                    if trade_id:
+                        repo.mark_setup_triggered(int(st["id"])) # 🚨 FIX: MATIKAN SETUP AGAR TIDAK SPAM
+                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY1", {
+                            "trade_id": trade_id, "entry1": entry1, "sl": float(st["sl"]), 
+                            "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"])
+                        })
 
-                ex, s, tf = t["exchange"], t["symbol"], t["timeframe"]
-                side, trade_id = t["side"], int(t["id"])
-                entry1 = float(t["entry1"])
-                entry2 = float(t["entry2"])
-                size1 = float(t.get("entry1_size") or 0)
-                size2 = float(t.get("entry2_size") or 0)
+            # 2. Pengecekan ENTRY 2 (Dari TRADES OPEN)
+            for t in repo.list_open_trades():
+                if t.get("filled_entry2") or t.get("entry2") is None: continue
+                ex, s, tf, side, t_id = t["exchange"], t["symbol"], t["timeframe"], t["side"], int(t["id"])
+                
+                tick = get_tick(s)
+                if tick is None:
+                    c = repo.get_recent_candles(ex, s, fallback_tf, 2)
+                    if not c: continue
+                    low, high, last_ts = float(c[-1]["low"]), float(c[-1]["high"]), int(c[-1]["ts_ms"])
+                else: low = high = float(tick); last_ts = now_ms
+                
+                entry1, entry2 = float(t["entry1"]), float(t["entry2"])
+                if low <= entry2 if side == "LONG" else high >= entry2:
+                    avg = _calc_avg_entry(entry1, float(t.get("entry1_size") or 0), entry2, float(t.get("entry2_size") or 0))
+                    if repo.mark_entry2_filled(t_id, entry2, avg):
+                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY2", {"trade_id": t_id, "entry1": entry1, "entry2": entry2, "avg_entry": avg})
 
-                tick_px = get_tick(s)
-                if tick_px is None:
-                    candles = repo.get_recent_candles(ex, s, fallback_tf, 2)
-                    if not candles:
-                        continue
-                    low = float(candles[-1]["low"])
-                    high = float(candles[-1]["high"])
-                    touched = low <= entry2 if side == "LONG" else high >= entry2
-                else:
-                    touched = float(tick_px) <= entry2 if side == "LONG" else float(tick_px) >= entry2
-
-                if not touched:
-                    continue
-
-                avg_entry = _calc_avg_entry(entry1, size1, entry2, size2)
-                if repo.mark_entry2_filled(trade_id, entry2, avg_entry):
-                    repo.insert_signal(ex, s, tf, int(time.time() * 1000), f"OPEN_{side}_STEP2", {
-                        "trade_id": trade_id,
-                        "entry1": entry1,
-                        "entry2": entry2,
-                        "avg_entry": avg_entry,
-                    })
-
-        except Exception as e:
-            log_error("EntryManager ERROR", e)
-
+        except Exception as e: log_error("EntryManager ERROR", e)
         shutdown_event.wait(1)
