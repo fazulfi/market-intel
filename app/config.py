@@ -115,3 +115,9 @@ ENTRY1_CHASE_ATR_PCT = float(os.getenv("ENTRY1_CHASE_ATR_PCT", 0.25))
 
 # --- V2.4.3 LIVE ENTRY1 ZONE ---
 ENTRY1_ZONE_ATR_PCT = float(os.getenv("ENTRY1_ZONE_ATR_PCT", 0.25))
+
+# --- V2.5 PARTIAL TP & BREAK-EVEN ---
+TP1_CLOSE_PCT = float(os.getenv("TP1_CLOSE_PCT", 0.30))
+TP2_CLOSE_PCT = float(os.getenv("TP2_CLOSE_PCT", 0.40))
+TP3_CLOSE_PCT = float(os.getenv("TP3_CLOSE_PCT", 0.30))
+MOVE_SL_TO_BE_AFTER_TP1 = os.getenv("MOVE_SL_TO_BE_AFTER_TP1", "true").lower() == "true"
