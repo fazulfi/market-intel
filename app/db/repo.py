@@ -98,6 +98,26 @@ class Repo:
             r = conn.execute(sql, (int(closed_ts_ms), float(close_price), reason, int(trade_id))).fetchone()
             return bool(r)
 
+
+    # --- V2.5 PARTIAL TP METHODS ---
+    def mark_partial_tp(self, trade_id: int, tp_level: int, close_pct: float, pnl_added: float, new_sl: float = None):
+        tp_col = f"tp{tp_level}_hit"
+        if new_sl is None:
+            sql = f"UPDATE trades SET {tp_col} = true, remaining_size_pct = GREATEST(remaining_size_pct - %s, 0.0), realized_pnl_pct = realized_pnl_pct + %s, updated_at = now() WHERE id = %s AND status = 'OPEN' RETURNING id;"
+            params = (float(close_pct), float(pnl_added), int(trade_id))
+        else:
+            sql = f"UPDATE trades SET {tp_col} = true, remaining_size_pct = GREATEST(remaining_size_pct - %s, 0.0), realized_pnl_pct = realized_pnl_pct + %s, sl = %s, updated_at = now() WHERE id = %s AND status = 'OPEN' RETURNING id;"
+            params = (float(close_pct), float(pnl_added), float(new_sl), int(trade_id))
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, params).fetchone()
+            return bool(r)
+
+    def close_trade_v25(self, trade_id: int, closed_ts_ms: int, close_price: float, close_reason: str, final_pnl: float, hit_tp3: bool = False):
+        sql = "UPDATE trades SET status='CLOSED', closed_ts_ms=%s, close_price=%s, close_reason=%s, realized_pnl_pct = realized_pnl_pct + %s, remaining_size_pct = 0.0, tp3_hit = CASE WHEN %s THEN true ELSE tp3_hit END, closed_at = now(), updated_at = now() WHERE id=%s AND status='OPEN' RETURNING id;"
+        with self.pool.connection() as conn:
+            r = conn.execute(sql, (int(closed_ts_ms), float(close_price), str(close_reason), float(final_pnl), bool(hit_tp3), int(trade_id))).fetchone()
+            return bool(r)
+
     def list_open_trades(self):
         sql = "SELECT * FROM trades WHERE status='OPEN' ORDER BY id ASC;"
         with self.pool.connection() as conn:
@@ -112,39 +132,34 @@ class Repo:
             return int(row["open_count"]) if row else 0
 
     def fetch_trade_stats_window(self, seconds: int):
-        # Hitung PnL dinamis dari close_price dan entry (kolom pnl_pct tidak wajib ada)
-        sql = """
+        sql = '''
+        WITH base AS (
+            SELECT
+                CASE
+                    WHEN (tp1_hit = true OR tp2_hit = true OR tp3_hit = true OR realized_pnl_pct != 0)
+                        THEN realized_pnl_pct
+                    WHEN side='LONG' THEN (close_price - entry) / entry * 100.0
+                    WHEN side='SHORT' THEN (entry - close_price) / entry * 100.0
+                    ELSE 0.0
+                END AS pnl_pct,
+                close_reason
+            FROM trades
+            WHERE status='CLOSED'
+              AND closed_at >= now() - (%s || ' seconds')::interval
+        )
         SELECT
-          COUNT(*) FILTER (WHERE status='CLOSED') AS closed,
-          COUNT(*) FILTER (WHERE status='CLOSED' AND (
-              (side='LONG' AND close_price > entry) OR
-              (side='SHORT' AND close_price < entry)
-          )) AS wins,
-          COUNT(*) FILTER (WHERE status='CLOSED' AND (
-              (side='LONG' AND close_price <= entry) OR
-              (side='SHORT' AND close_price >= entry)
-          )) AS losses,
-          COALESCE(AVG(
-              CASE
-                  WHEN side='LONG' THEN (close_price - entry) / entry * 100.0
-                  WHEN side='SHORT' THEN (entry - close_price) / entry * 100.0
-              END
-          ) FILTER (WHERE status='CLOSED'), 0) AS avg_pnl,
-          COALESCE(SUM(
-              CASE
-                  WHEN side='LONG' THEN (close_price - entry) / entry * 100.0
-                  WHEN side='SHORT' THEN (entry - close_price) / entry * 100.0
-              END
-          ) FILTER (WHERE status='CLOSED'), 0) AS sum_pnl
-        FROM trades
-        WHERE closed_at >= now() - (%s || ' seconds')::interval;
-        """
+            COUNT(*) AS closed,
+            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
+            COUNT(*) FILTER (WHERE pnl_pct <= 0) AS losses,
+            COUNT(*) FILTER (WHERE close_reason = 'SL (Break-Even)') AS be_exits,
+            COALESCE(AVG(pnl_pct), 0) AS avg_pnl,
+            COALESCE(SUM(pnl_pct), 0) AS sum_pnl
+        FROM base;
+        '''
         with self.pool.connection() as conn:
             row = conn.execute(sql, (seconds,)).fetchone()
             return dict(row) if row else {}
 
-
-    # --- V1.8 SETUP METHODS (partial index safe) ---
     def upsert_setup_pending(self, exchange, symbol, tf, side, created_ts_ms, expires_ts_ms, level, payload: dict):
         import json
         sql = '''
@@ -287,21 +302,41 @@ class Repo:
     def open_trade_from_setup(self, setup: dict, opened_ts_ms: int):
         sql = '''
         INSERT INTO trades (
-            exchange, symbol, timeframe, side, status, opened_ts_ms, entry, tp, sl, atr14, vol_mult, level,
-            entry1, entry2, entry1_size, entry2_size, filled_entry2, avg_entry, updated_at
+            exchange, symbol, timeframe, side, status, opened_ts_ms,
+            entry, tp, sl, atr14, vol_mult, level,
+            entry1, entry2, entry1_size, entry2_size, filled_entry2, avg_entry,
+            tp1, tp2, tp3, remaining_size_pct, realized_pnl_pct,
+            tp1_hit, tp2_hit, tp3_hit, updated_at
         ) VALUES (
-            %s,%s,%s,%s,'OPEN',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now()
+            %s,%s,%s,%s,'OPEN',%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,1.0,0.0,
+            false,false,false, now()
         ) ON CONFLICT DO NOTHING RETURNING id;
         '''
         import json
         p = setup.get("payload", {})
-        if isinstance(p, str): p = json.loads(p)
+        if isinstance(p, str):
+            p = json.loads(p)
         with self.pool.connection() as conn:
             r = conn.execute(sql, (
                 setup["exchange"], setup["symbol"], setup["timeframe"], setup["side"], int(opened_ts_ms),
-                float(setup.get("avg_entry", setup["entry1"])), float(setup["tp3"]), float(setup["sl"]), float(setup["atr14"]),
-                float(p.get("vol_mult")) if p.get("vol_mult") else None, float(setup["level"]),
-                float(setup["entry1"]), float(setup["entry2"]), float(setup["entry1_size"]), float(setup["entry2_size"]),
-                False, float(setup["entry1"])
+                float(setup.get("avg_entry", setup["entry1"])),
+                float(setup["tp3"]),
+                float(setup["sl"]),
+                float(setup["atr14"]),
+                float(p.get("vol_mult")) if p.get("vol_mult") is not None else None,
+                float(setup["level"]),
+                float(setup["entry1"]),
+                float(setup["entry2"]),
+                float(setup["entry1_size"]),
+                float(setup["entry2_size"]),
+                False,
+                float(setup.get("avg_entry", setup["entry1"])),
+                float(setup.get("tp1", 0)),
+                float(setup.get("tp2", 0)),
+                float(setup.get("tp3", 0)),
             )).fetchone()
             return r["id"] if r else None
+
