@@ -112,3 +112,6 @@ SETUP_EXPIRY_BARS = int(os.getenv("SETUP_EXPIRY_BARS", 12))
 
 # --- V2.4.1 ENTRY1 CHASE ---
 ENTRY1_CHASE_ATR_PCT = float(os.getenv("ENTRY1_CHASE_ATR_PCT", 0.25))
+
+# --- V2.4.3 LIVE ENTRY1 ZONE ---
+ENTRY1_ZONE_ATR_PCT = float(os.getenv("ENTRY1_ZONE_ATR_PCT", 0.25))

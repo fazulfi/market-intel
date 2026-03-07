@@ -14,7 +14,7 @@ def _smallest_tf(timeframes):
     return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def entry_manager_loop(repo, shutdown_event):
-    log("EntryManager V2.4.1 starting")
+    log("EntryManager V2.4.3 starting")
     fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
@@ -28,42 +28,41 @@ def entry_manager_loop(repo, shutdown_event):
                     continue
 
                 ex, s, tf, side = st["exchange"], st["symbol"], st["timeframe"], st["side"]
+                if repo.get_open_trade(ex, s, tf): continue
+
                 payload = st.get("payload") or {}
                 if isinstance(payload, str):
                     try: payload = json.loads(payload)
                     except Exception: payload = {}
-
-                open_trade = repo.get_open_trade(ex, s, tf)
-                if open_trade: continue
-
-                instant_fill = bool(payload.get("instant_fill_entry1"))
-                instant_fill_price = payload.get("instant_fill_price")
-
-                # THE TOLERANCE CHASER
-                if instant_fill and instant_fill_price is not None:
-                    st["avg_entry"] = float(instant_fill_price)
-                    trade_id = repo.open_trade_from_setup(st, now_ms)
-                    if trade_id:
-                        repo.mark_setup_triggered(setup_id)
-                        repo.insert_signal(ex, s, tf, now_ms, f"FILL_{side}_ENTRY1", {"trade_id": trade_id, "entry1": float(instant_fill_price), "sl": float(st["sl"]), "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"])})
-                    continue
 
                 tick = get_tick(s)
                 if tick is None:
                     c = repo.get_recent_candles(ex, s, fallback_tf, 2)
                     if not c: continue
                     low, high, last_ts = float(c[-1]["low"]), float(c[-1]["high"]), int(c[-1]["ts_ms"])
+                    auto_zone_ok, fill_price = False, None
                 else:
-                    low = high = float(tick)
+                    low = high = last_px = float(tick)
                     last_ts = now_ms
+                    entry1, atr14 = float(st["entry1"]), float(st["atr14"])
+                    zone_limit = atr14 * ENTRY1_ZONE_ATR_PCT
+                    auto_zone_ok = abs(last_px - entry1) <= zone_limit
+                    fill_price = last_px if auto_zone_ok else None
 
                 entry1 = float(st["entry1"])
-                if (low <= entry1 if side == "LONG" else high >= entry1):
-                    st["avg_entry"] = entry1
+                hit_entry1 = (low <= entry1 if side == "LONG" else high >= entry1)
+
+                if hit_entry1 or auto_zone_ok:
+                    final_fill = fill_price if (auto_zone_ok and not hit_entry1 and fill_price is not None) else entry1
+                    st["avg_entry"] = float(final_fill)
                     trade_id = repo.open_trade_from_setup(st, last_ts)
                     if trade_id:
                         repo.mark_setup_triggered(setup_id)
-                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY1", {"trade_id": trade_id, "entry1": entry1, "sl": float(st["sl"]), "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"])})
+                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY1", {
+                            "trade_id": trade_id, "entry1": float(final_fill), "sl": float(st["sl"]),
+                            "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"]),
+                            "fill_mode": "AUTO_ZONE" if (auto_zone_ok and not hit_entry1) else "LEVEL_TOUCH"
+                        })
 
             for t in repo.list_open_trades():
                 if t.get("filled_entry2") or t.get("entry2") is None: continue
