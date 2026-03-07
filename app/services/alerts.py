@@ -33,7 +33,6 @@ def alert_loop(repo, shutdown_event):
                     try: p = json.loads(p)
                     except: p = {}
 
-                # 💎 THE VIP SIGNAL FORMAT 💎
                 if st in ("SETUP_LONG", "SETUP_SHORT"):
                     side = "LONG" if "LONG" in st else "SHORT"
                     icon = "🟢" if side == "LONG" else "🔴"
@@ -48,6 +47,7 @@ def alert_loop(repo, shutdown_event):
                     side = "LONG" if "LONG" in st else "SHORT"
                     step = "1" if "ENTRY1" in st else "2"
                     msg = f"⚡ <b>{side} FILLED (Step {step})</b>\n{sym} ({tf})\nFilled at: {float(p.get('entry'+step,0)):.4f}"
+                    if step == "1" and p.get("fill_mode"): msg += f"\nMode: {p.get('fill_mode')}"
                     if step == "2": msg += f"\nAvg Entry: {float(p.get('avg_entry',0)):.4f}"
 
                 elif "CLOSE" in st:
