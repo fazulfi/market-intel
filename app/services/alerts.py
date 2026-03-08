@@ -1,56 +1,112 @@
 import time
 import json
 import requests
+from collections import OrderedDict
 from app.config import *
 from app.utils.logging import log_error
 
-def send_telegram(text: str):
+def send_telegram(text: str, reply_to: int = None):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return
+        return None
     try:
-        requests.post(
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID, 
+            "parse_mode": "HTML", 
+            "text": text,
+            "allow_sending_without_reply": True
+        }
+        if reply_to:
+            payload["reply_to_message_id"] = reply_to
+
+        r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "parse_mode": "HTML", "text": text},
+            json=payload,
             timeout=10
         )
+        data = r.json()
+        if data.get("ok"):
+            return data.get("result", {}).get("message_id")
+        return None
     except Exception as e:
         log_error("Telegram ERROR", e)
+        return None
 
 def alert_loop(repo, shutdown_event):
     last_id = 0
     cooldown_cache = {}
+    thread_cache = OrderedDict()
+    retry_queue = {}
     last_cleanup = time.time()
 
     while not shutdown_event.is_set():
         try:
-            rows = repo.fetch_new_signals(last_id)
             now = time.time()
 
             if now - last_cleanup > 600:
                 cooldown_cache = {k: t for k, t in cooldown_cache.items() if t >= now - (ALERT_COOLDOWN_SEC * 2)}
+                
+                while len(thread_cache) > 500:
+                    thread_cache.popitem(last=False)
+                
+                # Bersihkan Retry Queue dari pesan yang sudah Expired (TTL 1 Jam)
+                retry_queue = {k: v for k, v in retry_queue.items() if v.get("expires_at", 0) > now}
+                
+                # FIX CLAUDE TERAKHIR (HARD CAP): Cegah Out Of Memory jika ratusan sinyal gagal!
+                while len(retry_queue) > 300:
+                    retry_queue.pop(next(iter(retry_queue)))
+                
                 last_cleanup = now
 
-            for r in rows:
-                last_id = r["id"]
-                st, sym, tf = r["signal_type"], r["symbol"], r["timeframe"]
+            # ========================================================
+            # 1. PROCESS RETRY QUEUE (Prioritas Utama)
+            # ========================================================
+            for sid, data in list(retry_queue.items()):
+                # Cegah Pengiriman Sinyal Zombie
+                if now >= data.get("expires_at", now + 1):
+                    retry_queue.pop(sid, None)
+                    continue
 
+                if now >= data["next_retry"]:
+                    fresh_reply_to = None if data["is_setup"] else thread_cache.get(data["thread_key"])
+
+                    sent_msg_id = send_telegram(data["msg"], reply_to=fresh_reply_to)
+                    if sent_msg_id:
+                        if data["is_setup"]: thread_cache[data["thread_key"]] = sent_msg_id
+                        elif data["is_close"]: thread_cache.pop(data["thread_key"], None)
+                        if not data["is_lifecycle"]: cooldown_cache[data["cache_key"]] = now
+                        retry_queue.pop(sid, None)
+                    else:
+                        retry_queue[sid]["next_retry"] = now + 30
+
+            # ========================================================
+            # 2. PROCESS NEW SIGNALS
+            # ========================================================
+            rows = repo.fetch_new_signals(last_id)
+            
+            for r in rows:
+                signal_id = r["id"]
+                last_id = max(last_id, signal_id)
+
+                st, sym, tf = r["signal_type"], r["symbol"], r["timeframe"]
                 is_lifecycle = ("PARTIAL" in st) or ("CLOSE" in st) or ("FILL" in st)
                 cache_key = f"{sym}|{tf}|{st}"
+                thread_key = f"{sym}|{tf}" 
 
                 if not is_lifecycle:
                     if cooldown_cache.get(cache_key) and (now - cooldown_cache.get(cache_key)) < ALERT_COOLDOWN_SEC:
                         continue
 
+                # PRE-GUARD DEDUPLIKASI
                 if not repo.mark_alert_sent(r["exchange"], r["symbol"], r["timeframe"], r["ts_ms"], r["signal_type"]):
                     continue
 
                 p = r.get("payload", {})
                 if isinstance(p, str):
-                    try:
-                        p = json.loads(p)
-                    except Exception:
-                        p = {}
+                    try: p = json.loads(p)
+                    except Exception: p = {}
 
+                # --- FORMAT PESAN ---
+                msg = ""
                 if st in ("SETUP_LONG", "SETUP_SHORT"):
                     side = "LONG" if "LONG" in st else "SHORT"
                     icon = "🟢" if side == "LONG" else "🔴"
@@ -66,11 +122,11 @@ def alert_loop(repo, shutdown_event):
                     side = "LONG" if "LONG" in st else "SHORT"
                     step = "1" if "ENTRY1" in st else "2"
                     msg = f"⚡ <b>{side} FILLED (Step {step})</b>\n{sym} ({tf})\n"
-                    msg += f"Filled at: {float(p.get('entry' + step, 0)):.4f}"
+                    msg += f"Filled at: {float(p.get('entry' + step, 0)):.4f}\n"
                     if step == "1" and p.get("fill_mode"):
-                        msg += f"\nMode: {p.get('fill_mode')}"
+                        msg += f"Mode: {p.get('fill_mode')}"
                     if step == "2":
-                        msg += f"\nAvg Entry: {float(p.get('avg_entry',0)):.4f}"
+                        msg += f"Avg Entry: {float(p.get('avg_entry',0)):.4f}"
 
                 elif st == "PARTIAL_TP1":
                     msg = f"🎯 <b>TP1 HIT</b>\n{sym} ({tf}) - {p.get('side','UNKNOWN')}\n"
@@ -106,9 +162,33 @@ def alert_loop(repo, shutdown_event):
                 else:
                     msg = f"🔔 {st} | {sym} {tf}"
 
-                send_telegram(msg)
-                if not is_lifecycle:
-                    cooldown_cache[cache_key] = now
+                if not msg:
+                    continue
+
+                reply_to_id = None
+                if st not in ("SETUP_LONG", "SETUP_SHORT"):
+                    reply_to_id = thread_cache.get(thread_key)
+
+                is_setup = st in ("SETUP_LONG", "SETUP_SHORT")
+                is_close = "CLOSE" in st
+
+                sent_msg_id = send_telegram(msg, reply_to=reply_to_id)
+
+                if sent_msg_id:
+                    if is_setup: thread_cache[thread_key] = sent_msg_id
+                    elif is_close: thread_cache.pop(thread_key, None)
+                    if not is_lifecycle: cooldown_cache[cache_key] = now
+                else:
+                    retry_queue[signal_id] = {
+                        "msg": msg,
+                        "thread_key": thread_key,
+                        "is_setup": is_setup,
+                        "is_close": is_close,
+                        "is_lifecycle": is_lifecycle,
+                        "cache_key": cache_key,
+                        "next_retry": now + 30,
+                        "expires_at": now + 3600
+                    }
 
         except Exception as e:
             log_error("Alert ERROR", e)
