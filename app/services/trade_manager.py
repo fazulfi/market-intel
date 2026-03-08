@@ -18,7 +18,7 @@ def trade_manager_loop(repo, shutdown_event):
     if not ENABLE_TRADES:
         return
 
-    log("TradeManager V2.5 (Partial TP + BE) starting")
+    log("TradeManager V2.6 (Super Profit Locker) starting")
     fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
@@ -54,123 +54,91 @@ def trade_manager_loop(repo, shutdown_event):
                     hi = lo = float(tick)
                     ts = now_ms
 
+                # ========================== LONG LOGIC ==========================
                 if side == "LONG":
                     if not tp1_hit and hi >= tp1:
                         pnl_added = calc_pnl_pct("LONG", avg_entry, tp1, TP1_CLOSE_PCT)
                         new_sl = avg_entry if MOVE_SL_TO_BE_AFTER_TP1 else sl
                         if repo.mark_partial_tp(trade_id, 1, TP1_CLOSE_PCT, pnl_added, new_sl):
                             repo.insert_signal(ex, s, tf, ts, "PARTIAL_TP1", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "exit": tp1,
-                                "closed_pct": TP1_CLOSE_PCT,
-                                "rem_pct": max(rem_size - TP1_CLOSE_PCT, 0.0),
-                                "pnl_added": pnl_added,
-                                "total_pnl": curr_pnl + pnl_added,
+                                "trade_id": trade_id, "side": side, "exit": tp1,
+                                "closed_pct": TP1_CLOSE_PCT, "rem_pct": max(rem_size - TP1_CLOSE_PCT, 0.0),
+                                "pnl_added": pnl_added, "total_pnl": curr_pnl + pnl_added,
                                 "sl_moved": MOVE_SL_TO_BE_AFTER_TP1
                             })
                         continue
 
                     if tp1_hit and not tp2_hit and hi >= tp2:
                         pnl_added = calc_pnl_pct("LONG", avg_entry, tp2, TP2_CLOSE_PCT)
-                        if repo.mark_partial_tp(trade_id, 2, TP2_CLOSE_PCT, pnl_added):
+                        new_sl = tp1 if MOVE_SL_TO_TP1_AFTER_TP2 else None
+                        if repo.mark_partial_tp(trade_id, 2, TP2_CLOSE_PCT, pnl_added, new_sl):
                             repo.insert_signal(ex, s, tf, ts, "PARTIAL_TP2", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "exit": tp2,
-                                "closed_pct": TP2_CLOSE_PCT,
-                                "rem_pct": max(rem_size - TP2_CLOSE_PCT, 0.0),
-                                "pnl_added": pnl_added,
-                                "total_pnl": curr_pnl + pnl_added,
+                                "trade_id": trade_id, "side": side, "exit": tp2,
+                                "closed_pct": TP2_CLOSE_PCT, "rem_pct": max(rem_size - TP2_CLOSE_PCT, 0.0),
+                                "pnl_added": pnl_added, "total_pnl": curr_pnl + pnl_added,
+                                "sl_moved_to_tp1": MOVE_SL_TO_TP1_AFTER_TP2
                             })
                         continue
 
                     if hi >= tp3:
                         pnl_added = calc_pnl_pct("LONG", avg_entry, tp3, rem_size)
                         if repo.close_trade_v25(trade_id, ts, tp3, "TP3", pnl_added, hit_tp3=True):
-                            repo.insert_signal(ex, s, tf, ts, "CLOSE_TP3", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "entry": avg_entry,
-                                "close_price": tp3,
-                                "total_pnl": curr_pnl + pnl_added,
-                                "reason": "TP3"
-                            })
+                            repo.insert_signal(ex, s, tf, ts, "CLOSE_TP3", {"trade_id": trade_id, "side": side, "entry": avg_entry, "close_price": tp3, "total_pnl": curr_pnl + pnl_added, "reason": "TP3"})
                         continue
 
                     if lo <= sl:
                         pnl_added = calc_pnl_pct("LONG", avg_entry, sl, rem_size)
-                        reason = "SL (Break-Even)" if abs(sl - avg_entry) < 1e-12 else "SL"
+                        reason = "SL"
+                        if abs(sl - avg_entry) < 1e-12: reason = "SL (Break-Even)"
+                        elif sl > avg_entry: reason = "SL (Trailing Profit)"
+                        
                         if repo.close_trade_v25(trade_id, ts, sl, reason, pnl_added, hit_tp3=False):
-                            repo.insert_signal(ex, s, tf, ts, "CLOSE_SL", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "entry": avg_entry,
-                                "close_price": sl,
-                                "total_pnl": curr_pnl + pnl_added,
-                                "reason": reason
-                            })
+                            repo.insert_signal(ex, s, tf, ts, "CLOSE_SL", {"trade_id": trade_id, "side": side, "entry": avg_entry, "close_price": sl, "total_pnl": curr_pnl + pnl_added, "reason": reason})
                         continue
 
+                # ========================== SHORT LOGIC ==========================
                 else:
                     if not tp1_hit and lo <= tp1:
                         pnl_added = calc_pnl_pct("SHORT", avg_entry, tp1, TP1_CLOSE_PCT)
                         new_sl = avg_entry if MOVE_SL_TO_BE_AFTER_TP1 else sl
                         if repo.mark_partial_tp(trade_id, 1, TP1_CLOSE_PCT, pnl_added, new_sl):
                             repo.insert_signal(ex, s, tf, ts, "PARTIAL_TP1", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "exit": tp1,
-                                "closed_pct": TP1_CLOSE_PCT,
-                                "rem_pct": max(rem_size - TP1_CLOSE_PCT, 0.0),
-                                "pnl_added": pnl_added,
-                                "total_pnl": curr_pnl + pnl_added,
+                                "trade_id": trade_id, "side": side, "exit": tp1,
+                                "closed_pct": TP1_CLOSE_PCT, "rem_pct": max(rem_size - TP1_CLOSE_PCT, 0.0),
+                                "pnl_added": pnl_added, "total_pnl": curr_pnl + pnl_added,
                                 "sl_moved": MOVE_SL_TO_BE_AFTER_TP1
                             })
                         continue
 
                     if tp1_hit and not tp2_hit and lo <= tp2:
                         pnl_added = calc_pnl_pct("SHORT", avg_entry, tp2, TP2_CLOSE_PCT)
-                        if repo.mark_partial_tp(trade_id, 2, TP2_CLOSE_PCT, pnl_added):
+                        new_sl = tp1 if MOVE_SL_TO_TP1_AFTER_TP2 else None
+                        if repo.mark_partial_tp(trade_id, 2, TP2_CLOSE_PCT, pnl_added, new_sl):
                             repo.insert_signal(ex, s, tf, ts, "PARTIAL_TP2", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "exit": tp2,
-                                "closed_pct": TP2_CLOSE_PCT,
-                                "rem_pct": max(rem_size - TP2_CLOSE_PCT, 0.0),
-                                "pnl_added": pnl_added,
-                                "total_pnl": curr_pnl + pnl_added,
+                                "trade_id": trade_id, "side": side, "exit": tp2,
+                                "closed_pct": TP2_CLOSE_PCT, "rem_pct": max(rem_size - TP2_CLOSE_PCT, 0.0),
+                                "pnl_added": pnl_added, "total_pnl": curr_pnl + pnl_added,
+                                "sl_moved_to_tp1": MOVE_SL_TO_TP1_AFTER_TP2
                             })
                         continue
 
                     if lo <= tp3:
                         pnl_added = calc_pnl_pct("SHORT", avg_entry, tp3, rem_size)
                         if repo.close_trade_v25(trade_id, ts, tp3, "TP3", pnl_added, hit_tp3=True):
-                            repo.insert_signal(ex, s, tf, ts, "CLOSE_TP3", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "entry": avg_entry,
-                                "close_price": tp3,
-                                "total_pnl": curr_pnl + pnl_added,
-                                "reason": "TP3"
-                            })
+                            repo.insert_signal(ex, s, tf, ts, "CLOSE_TP3", {"trade_id": trade_id, "side": side, "entry": avg_entry, "close_price": tp3, "total_pnl": curr_pnl + pnl_added, "reason": "TP3"})
                         continue
 
                     if hi >= sl:
                         pnl_added = calc_pnl_pct("SHORT", avg_entry, sl, rem_size)
-                        reason = "SL (Break-Even)" if abs(sl - avg_entry) < 1e-12 else "SL"
+                        reason = "SL"
+                        if abs(sl - avg_entry) < 1e-12: reason = "SL (Break-Even)"
+                        elif sl < avg_entry: reason = "SL (Trailing Profit)"
+                        
                         if repo.close_trade_v25(trade_id, ts, sl, reason, pnl_added, hit_tp3=False):
-                            repo.insert_signal(ex, s, tf, ts, "CLOSE_SL", {
-                                "trade_id": trade_id,
-                                "side": side,
-                                "entry": avg_entry,
-                                "close_price": sl,
-                                "total_pnl": curr_pnl + pnl_added,
-                                "reason": reason
-                            })
+                            repo.insert_signal(ex, s, tf, ts, "CLOSE_SL", {"trade_id": trade_id, "side": side, "entry": avg_entry, "close_price": sl, "total_pnl": curr_pnl + pnl_added, "reason": reason})
                         continue
 
         except Exception as e:
-            log_error("TradeManager V2.5 ERROR", e)
+            log_error("TradeManager V2.6 ERROR", e)
 
         shutdown_event.wait(1 if ENABLE_WS_TICKER else TRADE_MANAGER_INTERVAL_SEC)
