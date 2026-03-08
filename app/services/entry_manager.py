@@ -14,7 +14,7 @@ def _smallest_tf(timeframes):
     return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def entry_manager_loop(repo, shutdown_event):
-    log("EntryManager V2.4.3 starting")
+    log("EntryManager V2.7 (Strict Momentum Sniper) starting")
     fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
@@ -39,21 +39,39 @@ def entry_manager_loop(repo, shutdown_event):
                 if tick is None:
                     c = repo.get_recent_candles(ex, s, fallback_tf, 2)
                     if not c: continue
-                    low, high, last_ts = float(c[-1]["low"]), float(c[-1]["high"]), int(c[-1]["ts_ms"])
-                    auto_zone_ok, fill_price = False, None
+                    low, high, last_px = float(c[-1]["low"]), float(c[-1]["high"]), float(c[-1]["close"])
+                    last_ts = int(c[-1]["ts_ms"])
                 else:
                     low = high = last_px = float(tick)
                     last_ts = now_ms
-                    entry1, atr14 = float(st["entry1"]), float(st["atr14"])
-                    zone_limit = atr14 * ENTRY1_ZONE_ATR_PCT
-                    auto_zone_ok = abs(last_px - entry1) <= zone_limit
-                    fill_price = last_px if auto_zone_ok else None
-
+                
                 entry1 = float(st["entry1"])
-                hit_entry1 = (low <= entry1 if side == "LONG" else high >= entry1)
+                atr14 = float(st["atr14"])
+                chase_limit = atr14 * ENTRY1_CHASE_ATR_PCT
 
-                if hit_entry1 or auto_zone_ok:
-                    final_fill = fill_price if (auto_zone_ok and not hit_entry1 and fill_price is not None) else entry1
+                # ========================================================
+                # V2.7 STRICT MOMENTUM ENTRY LOGIC
+                # Eksekusi HANYA jika harga (last_px) berada di zona momentum.
+                # Mode menunggu pullback/sentuhan ulang DIHAPUS TOTAL!
+                # ========================================================
+                hit_entry1 = False
+                fill_mode = ""
+                final_fill = entry1
+
+                if side == "LONG":
+                    # Instant Fill: Harga masih di sekitar area breakout
+                    if entry1 <= last_px <= (entry1 + chase_limit):
+                        hit_entry1 = True
+                        fill_mode = "INSTANT_BREAKOUT"
+                        final_fill = last_px 
+                else:
+                    # Instant Fill untuk skenario SHORT
+                    if entry1 >= last_px >= (entry1 - chase_limit):
+                        hit_entry1 = True
+                        fill_mode = "INSTANT_BREAKOUT"
+                        final_fill = last_px
+
+                if hit_entry1:
                     st["avg_entry"] = float(final_fill)
                     trade_id = repo.open_trade_from_setup(st, last_ts)
                     if trade_id:
@@ -61,9 +79,12 @@ def entry_manager_loop(repo, shutdown_event):
                         repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY1", {
                             "trade_id": trade_id, "entry1": float(final_fill), "sl": float(st["sl"]),
                             "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"]),
-                            "fill_mode": "AUTO_ZONE" if (auto_zone_ok and not hit_entry1) else "LEVEL_TOUCH"
+                            "fill_mode": fill_mode
                         })
 
+            # ========================================================
+            # ENTRY 2 LOGIC (Tetap dipertahankan untuk DCA/Averaging)
+            # ========================================================
             for t in repo.list_open_trades():
                 if t.get("filled_entry2") or t.get("entry2") is None: continue
                 ex, s, tf, side, t_id = t["exchange"], t["symbol"], t["timeframe"], t["side"], int(t["id"])

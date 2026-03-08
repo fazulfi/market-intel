@@ -86,7 +86,9 @@ def alert_loop(repo, shutdown_event):
                     msg += f"Exit: {float(p.get('exit',0)):.4f}\n"
                     msg += f"Closed Size: {int(float(p.get('closed_pct',0))*100)}%\n"
                     msg += f"Remaining: {int(float(p.get('rem_pct',0))*100)}%\n"
-                    msg += f"Realized PnL: {float(p.get('total_pnl',0)):+.2f}%"
+                    msg += f"Realized PnL: {float(p.get('total_pnl',0)):+.2f}%\n"
+                    if p.get("sl_moved_to_tp1"):
+                        msg += "🛡️ <i>SL moved to TP1 (Profit Locker)</i>"
 
                 elif "CLOSE" in st:
                     icon = "🏆" if "TP" in st else "💀"

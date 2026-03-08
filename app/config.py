@@ -65,7 +65,7 @@ WS_PING_SEC = int(os.getenv("WS_PING_SEC", 20))
 WS_RECONNECT_SEC = int(os.getenv("WS_RECONNECT_SEC", 3))
 
 def _parse_tf_map(raw: str):
-    # format: "1m:5m,5m:15m,15m:1h"
+    # Format: "1m:5m,5m:15m,15m:1h"
     out = {}
     for part in (raw or "").split(","):
         part = part.strip()
@@ -88,7 +88,7 @@ def _csv_fallback(name, fallback):
     xs = [x.strip() for x in raw.split(",") if x.strip()]
     return xs or fallback
 
-WS_KLINE_TIMEFRAMES = _csv_fallback("WS_KLINE_TIMEFRAMES", ["1m","5m","15m","1h","4h"])
+WS_KLINE_TIMEFRAMES = _csv_fallback("WS_KLINE_TIMEFRAMES", ["1m", "5m", "15m", "1h"])
 
 # --- V2.3 TWO-STEP ENTRY ---
 ENTRY1_SIZE = float(os.getenv("ENTRY1_SIZE", 0.30))
@@ -121,3 +121,6 @@ TP1_CLOSE_PCT = float(os.getenv("TP1_CLOSE_PCT", 0.30))
 TP2_CLOSE_PCT = float(os.getenv("TP2_CLOSE_PCT", 0.40))
 TP3_CLOSE_PCT = float(os.getenv("TP3_CLOSE_PCT", 0.30))
 MOVE_SL_TO_BE_AFTER_TP1 = os.getenv("MOVE_SL_TO_BE_AFTER_TP1", "true").lower() == "true"
+
+# --- V2.6 ADVANCED TRAILING STOP ---
+MOVE_SL_TO_TP1_AFTER_TP2 = os.getenv("MOVE_SL_TO_TP1_AFTER_TP2", "true").lower() == "true"
