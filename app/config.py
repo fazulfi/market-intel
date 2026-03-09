@@ -1,11 +1,37 @@
 import os
+from pathlib import Path
 
 def _csv(name):
     raw = os.getenv(name, "")
     return [x.strip() for x in raw.split(",") if x.strip()]
 
+def _normalize_symbols(items):
+    seen = set()
+    out = []
+    for item in items:
+        s = item.strip().upper()
+        if not s or s.startswith("#"):
+            continue
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
+
+def _load_symbols():
+    symbols_file = os.getenv("SYMBOLS_FILE", "/workspace/tickers.txt")
+    path = Path(symbols_file)
+
+    if path.exists():
+        symbols = _normalize_symbols(path.read_text(encoding="utf-8").splitlines())
+        if not symbols:
+            raise ValueError(f"No symbols found in {symbols_file}")
+        return symbols
+
+    fallback = _normalize_symbols(_csv("SYMBOLS"))
+    return fallback or ["BTC/USDT:USDT"]
+
 EXCHANGE = os.getenv("EXCHANGE", "bybit")
-SYMBOLS = _csv("SYMBOLS")
+SYMBOLS = _load_symbols()
 TIMEFRAMES = _csv("TIMEFRAMES") or ["1m", "5m"]
 
 COLLECTOR_INTERVAL_SEC = int(os.getenv("COLLECTOR_INTERVAL_SEC", 20))

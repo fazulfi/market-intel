@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./tickers.txt:/workspace/tickers.txt:ro
     command: ["python", "-u", "-m", "app.main"]
 
 volumes:

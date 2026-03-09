@@ -1,0 +1,14 @@
+# ==========================================
+# GUDANG KOIN MARKET INTEL V3.1
+# Tambahkan koin baru di bawah. 
+# Baris berawalan '#' akan diabaikan otomatis.
+# ==========================================
+
+# --- MAJOR COINS ---
+BTC/USDT:USDT
+ETH/USDT:USDT
+
+# --- TOP ALTCOINS ---
+SOL/USDT:USDT
+XRP/USDT:USDT
+DOGE/USDT:USDT
