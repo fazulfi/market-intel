@@ -161,3 +161,6 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 # --- V3.0 MULTI-INSTANCE ---
 ENABLE_SUMMARY = os.getenv('ENABLE_SUMMARY', 'true').lower() == 'true'
+
+# --- V3.4 TELEGRAM CHANNEL ROUTING ---
+TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')

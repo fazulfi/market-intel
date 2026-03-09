@@ -31,12 +31,15 @@ def fmt_px(val):
     except Exception:
         return "ERR"
 
-def send_telegram(text: str, reply_to: int = None):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+# V3.4: Pilihan jalur target (Channel vs Private)
+def send_telegram(text: str, reply_to: int = None, chat_id: str = None):
+    # Kalau chat_id dikosongkan (seperti saat Summary memanggil ini), dia otomatis lari ke Private Chat!
+    target_chat = chat_id or TELEGRAM_CHAT_ID
+    if not TELEGRAM_BOT_TOKEN or not target_chat:
         return None
     try:
         payload = {
-            "chat_id": TELEGRAM_CHAT_ID, 
+            "chat_id": target_chat, 
             "parse_mode": "HTML", 
             "text": text,
             "allow_sending_without_reply": True
@@ -92,7 +95,8 @@ def alert_loop(repo, shutdown_event):
                 if now >= data["next_retry"]:
                     fresh_reply_to = None if data["is_setup"] else thread_cache.get(data["thread_key"])
 
-                    sent_msg_id = send_telegram(data["msg"], reply_to=fresh_reply_to)
+                    # TEMBAK RETRY KE CHANNEL
+                    sent_msg_id = send_telegram(data["msg"], reply_to=fresh_reply_to, chat_id=TELEGRAM_CHANNEL_ID)
                     
                     if sent_msg_id:
                         if data["is_setup"]: thread_cache[data["thread_key"]] = sent_msg_id
@@ -112,6 +116,8 @@ def alert_loop(repo, shutdown_event):
                 last_id = max(last_id, signal_id)
 
                 st, sym, tf = r["signal_type"], r["symbol"], r["timeframe"]
+                if tf not in TIMEFRAMES:
+                    continue
                 is_lifecycle = ("PARTIAL" in st) or ("CLOSE" in st) or ("FILL" in st)
                 cache_key = f"{sym}|{tf}|{st}"
                 thread_key = f"{sym}|{tf}" 
@@ -196,7 +202,8 @@ def alert_loop(repo, shutdown_event):
                 is_setup = st in ("SETUP_LONG", "SETUP_SHORT")
                 is_close = "CLOSE" in st
 
-                sent_msg_id = send_telegram(msg, reply_to=reply_to_id)
+                # TEMBAK SINYAL KE CHANNEL
+                sent_msg_id = send_telegram(msg, reply_to=reply_to_id, chat_id=TELEGRAM_CHANNEL_ID)
 
                 if sent_msg_id:
                     if is_setup: thread_cache[thread_key] = sent_msg_id
