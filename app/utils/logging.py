@@ -1,44 +1,76 @@
-from datetime import datetime, timezone
-import traceback
+import logging
+import os
+import sys
+from logging.handlers import RotatingFileHandler
 
-# === ANSI COLOR CODES ===
-RESET = "\033[0m"
-GRAY = "\033[90m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-RED = "\033[91m"
-CYAN = "\033[96m"
-MAGENTA = "\033[95m"
-WHITE = "\033[97m"
+# Ambil identitas dari .env
+BOT_NAME = os.getenv("BOT_NAME", "GhostBot")
 
-def log(msg):
-    # Memperpendek format waktu agar tidak memenuhi layar (Contoh: 26-03-09 10:15:30)
-    ts = datetime.now(timezone.utc).strftime("%y-%m-%d %H:%M:%S")
-    
-    # Deteksi otomatis warna berdasarkan kata kunci!
-    msg_upper = msg.upper()
-    
-    if "ERROR" in msg_upper or "FAIL" in msg_upper or "DITOLAK" in msg_upper:
-        color = RED
-    elif "HEALTH OK" in msg_upper:
-        color = MAGENTA  # Detak jantung warna pink/ungu
-    elif "STARTING" in msg_upper or "CONNECTED" in msg_upper or "COMPLETE" in msg_upper:
-        color = GREEN    # Status sukses warna hijau
-    elif "SUBSCRIBED" in msg_upper or "BACKFILL" in msg_upper or "TOPICS" in msg_upper:
-        color = CYAN     # Aktivitas data warna biru muda
-    elif "⚠️" in msg or "WARN" in msg_upper:
-        color = YELLOW   # Peringatan warna kuning
-    else:
-        color = WHITE    # Default
+LOG_DIR = "logs"
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
 
-    # Cetak log dengan warna yang sudah diatur
-    print(f"{GRAY}[{ts}]{RESET} {color}{msg}{RESET}", flush=True)
+logger = logging.getLogger(BOT_NAME)
+logger.setLevel(logging.INFO)
 
-def log_error(prefix, e):
-    ts = datetime.now(timezone.utc).strftime("%y-%m-%d %H:%M:%S")
-    print(f"{GRAY}[{ts}]{RESET} {RED}❌ {prefix}: {e}{RESET}", flush=True)
-    
-    # Cetak Traceback (Detail Error) dengan warna merah redup agar tidak menyilaukan
-    print(f"\033[31m", end="")
-    traceback.print_exc()
-    print(f"{RESET}", end="", flush=True)
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# --- THE MAGIC WAND: COLOR FORMATTER ---
+class ColoredFormatter(logging.Formatter):
+    # ANSI escape codes
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    RESET = "\033[0m"
+
+    def format(self, record):
+        # Pilih warna berdasarkan level (Hijau=INFO, Merah=ERROR, Kuning=WARN)
+        if record.levelno == logging.DEBUG:
+            color = self.CYAN
+        elif record.levelno == logging.INFO:
+            color = self.GREEN
+        elif record.levelno == logging.WARNING:
+            color = self.YELLOW
+        elif record.levelno >= logging.ERROR:
+            color = self.RED
+        else:
+            color = self.RESET
+
+        # Rakit teks dengan warna
+        format_str = f"{color}%(asctime)s | %(levelname)-8s | [{BOT_NAME}] %(message)s{self.RESET}"
+        formatter = logging.Formatter(format_str, datefmt='%Y-%m-%d %H:%M:%S')
+        return formatter.format(record)
+
+plain_formatter = logging.Formatter(
+    fmt=f'%(asctime)s | %(levelname)-8s | [{BOT_NAME}] %(message)s', 
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# 1. FILE HANDLER (TETAP POLOS AGAR FILE .LOG BERSIH)
+safe_bot_name = BOT_NAME.replace(" ", "_").lower()
+file_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, f"{safe_bot_name}.log"), 
+    maxBytes=5*1024*1024, 
+    backupCount=3
+)
+file_handler.setFormatter(plain_formatter)
+logger.addHandler(file_handler)
+
+# 2. CONSOLE HANDLER (BERWARNA UNTUK MATA KAPTEN!)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(ColoredFormatter())
+logger.addHandler(console_handler)
+
+def log(msg: str):
+    logger.info(msg)
+
+def log_error(context: str, e: Exception):
+    logger.error(f"{context}: {e}", exc_info=True)
+
+def log_debug(msg: str):
+    logger.debug(msg)
+
+def log_warning(msg: str):
+    logger.warning(msg)
