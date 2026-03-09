@@ -124,3 +124,8 @@ MOVE_SL_TO_BE_AFTER_TP1 = os.getenv("MOVE_SL_TO_BE_AFTER_TP1", "true").lower() =
 
 # --- V2.6 ADVANCED TRAILING STOP ---
 MOVE_SL_TO_TP1_AFTER_TP2 = os.getenv("MOVE_SL_TO_TP1_AFTER_TP2", "true").lower() == "true"
+
+# --- V2.9 WEEKLY SUMMARY ---
+SUMMARY_WEEKLY_DAY = int(os.getenv("SUMMARY_WEEKLY_DAY", "0"))    # 0=Senin, 6=Minggu
+SUMMARY_WEEKLY_HOUR = int(os.getenv("SUMMARY_WEEKLY_HOUR", "0"))
+SUMMARY_WEEKLY_MINUTE = int(os.getenv("SUMMARY_WEEKLY_MINUTE", "10"))

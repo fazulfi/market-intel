@@ -27,10 +27,11 @@ def _fmt_stats(title: str, s: dict, open_count: int) -> str:
     return "\n".join(msg)
 
 def summary_loop(repo, shutdown_event):
-    log("Summary service V2.5 starting")
+    log("Summary service V2.9 starting")
 
     last_hour_key = None
     last_day_key = None
+    last_week_key = None  # V2.9 Kunci Ingatan Mingguan
 
     while not shutdown_event.is_set():
         try:
@@ -48,6 +49,18 @@ def summary_loop(repo, shutdown_event):
                 s = repo.fetch_trade_stats_window(86400)
                 send_telegram(_fmt_stats("Daily Summary (last 24h)", s, open_count))
                 last_day_key = day_key
+
+            # ========================================================
+            # V2.9: WEEKLY SUMMARY LOGIC
+            # ========================================================
+            week_key = now.isocalendar()[:2]  # Format: (Tahun, Minggu-ke)
+            if (now.weekday() == SUMMARY_WEEKLY_DAY
+                    and now.hour == SUMMARY_WEEKLY_HOUR
+                    and now.minute == SUMMARY_WEEKLY_MINUTE
+                    and week_key != last_week_key):
+                s = repo.fetch_trade_stats_window(604800)  # 7 Hari = 604800 detik
+                send_telegram(_fmt_stats("Weekly Summary (last 7d)", s, open_count))
+                last_week_key = week_key
 
         except Exception as e:
             log_error("Summary ERROR", e)
