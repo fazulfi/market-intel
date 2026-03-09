@@ -129,3 +129,6 @@ MOVE_SL_TO_TP1_AFTER_TP2 = os.getenv("MOVE_SL_TO_TP1_AFTER_TP2", "true").lower()
 SUMMARY_WEEKLY_DAY = int(os.getenv("SUMMARY_WEEKLY_DAY", "0"))    # 0=Senin, 6=Minggu
 SUMMARY_WEEKLY_HOUR = int(os.getenv("SUMMARY_WEEKLY_HOUR", "0"))
 SUMMARY_WEEKLY_MINUTE = int(os.getenv("SUMMARY_WEEKLY_MINUTE", "10"))
+
+# --- V3.0 REDIS ENGINE ---
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
