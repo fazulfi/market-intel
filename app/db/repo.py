@@ -125,13 +125,13 @@ class Repo:
             return [dict(r) for r in rows]
 
     # --- V1.7 SUMMARY METHODS ---
-    def fetch_open_trades_count(self):
-        sql = "SELECT COUNT(*) AS open_count FROM trades WHERE status='OPEN';"
+    def fetch_open_trades_count(self, tfs: list):
+        sql = "SELECT COUNT(*) AS open_count FROM trades WHERE status='OPEN' AND timeframe = ANY(%s);"
         with self.pool.connection() as conn:
-            row = conn.execute(sql).fetchone()
+            row = conn.execute(sql, (tfs,)).fetchone()
             return int(row["open_count"]) if row else 0
 
-    def fetch_trade_stats_window(self, seconds: int):
+    def fetch_trade_stats_window(self, seconds: int, tfs: list):
         sql = '''
         WITH base AS (
             SELECT
@@ -146,6 +146,7 @@ class Repo:
             FROM trades
             WHERE status='CLOSED'
               AND closed_at >= now() - (%s || ' seconds')::interval
+              AND timeframe = ANY(%s)
         )
         SELECT
             COUNT(*) AS closed,
@@ -157,7 +158,7 @@ class Repo:
         FROM base;
         '''
         with self.pool.connection() as conn:
-            row = conn.execute(sql, (seconds,)).fetchone()
+            row = conn.execute(sql, (seconds, tfs)).fetchone()
             return dict(row) if row else {}
 
     def upsert_setup_pending(self, exchange, symbol, tf, side, created_ts_ms, expires_ts_ms, level, payload: dict):
