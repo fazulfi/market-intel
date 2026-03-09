@@ -10,9 +10,26 @@ def fmt_px(val):
     if val is None or val == "" or val == 0:
         return "0"
     try:
-        return f"{float(val):.10f}".rstrip('0').rstrip('.')
+        v = float(val)
+        
+        # Smart Dynamic Precision: Sesuaikan desimal berdasarkan besaran harga
+        if v >= 1000:
+            res = f"{v:.2f}"      # Contoh: BTC (65000.50)
+        elif v >= 10:
+            res = f"{v:.3f}"      # Contoh: BNB (628.663)
+        elif v >= 1:
+            res = f"{v:.4f}"      # Contoh: SUI/WIF jika di atas $1 (1.2345)
+        elif v >= 0.01:
+            res = f"{v:.5f}"      # Contoh: SUI saat ini (0.90792)
+        elif v >= 0.0001:
+            res = f"{v:.6f}"      # Contoh: 1000PEPE (0.00330)
+        else:
+            res = f"{v:.10f}"     # Contoh: Koin super micin (0.0000001234)
+            
+        # Hapus sisa nol di belakang agar tetap rapi
+        return res.rstrip('0').rstrip('.')
     except Exception:
-        return "ERR"   # Biar ketahuan kalau corrupt!
+        return "ERR"
 
 def send_telegram(text: str, reply_to: int = None):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:

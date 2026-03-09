@@ -63,7 +63,7 @@ def signal_loop(repo, shutdown_event):
                         entry1, entry2 = level - (atr14 * ENTRY1_ATR_OFFSET), level - (atr14 * ENTRY2_ATR_OFFSET)
                         sl = level - (atr14 * SL_ATR_MULT)
                         tp1, tp2, tp3 = level + (atr14 * TP1_ATR_MULT), level + (atr14 * TP2_ATR_MULT), level + (atr14 * TP3_ATR_MULT)
-                        payload = {"level": level, "entry1": float(entry1), "entry2": float(entry2), "sl": float(sl), "tp1": float(tp1), "tp2": float(tp2), "tp3": float(tp3), "atr14": round(atr14, 6), "vol_mult": vol_mult, "trend_tf": trend_tf, "atr_tf": atr_tf, "entry1_size": ENTRY1_SIZE, "entry2_size": ENTRY2_SIZE}
+                        payload = {"level": level, "entry1": float(entry1), "entry2": float(entry2), "sl": float(sl), "tp1": float(tp1), "tp2": float(tp2), "tp3": float(tp3), "atr14": round(atr14, 10), "vol_mult": vol_mult, "trend_tf": trend_tf, "atr_tf": atr_tf, "entry1_size": ENTRY1_SIZE, "entry2_size": ENTRY2_SIZE}
                         setup_id = repo.create_layered_setup(EXCHANGE, s, tf, "LONG", ts, ts + (_TF_SEC.get(tf, 60) * 1000 * SETUP_EXPIRY_BARS), payload)
                         if setup_id: repo.insert_signal(EXCHANGE, s, tf, ts, "SETUP_LONG", {"setup_id": setup_id, **payload})
 
