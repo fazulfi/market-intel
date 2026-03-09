@@ -28,6 +28,7 @@ def entry_manager_loop(repo, shutdown_event):
                     continue
 
                 ex, s, tf, side = st["exchange"], st["symbol"], st["timeframe"], st["side"]
+                if tf not in TIMEFRAMES: continue
                 if repo.get_open_trade(ex, s, tf): continue
 
                 payload = st.get("payload") or {}
@@ -88,6 +89,7 @@ def entry_manager_loop(repo, shutdown_event):
             for t in repo.list_open_trades():
                 if t.get("filled_entry2") or t.get("entry2") is None: continue
                 ex, s, tf, side, t_id = t["exchange"], t["symbol"], t["timeframe"], t["side"], int(t["id"])
+                if tf not in TIMEFRAMES: continue
 
                 tick = get_tick(s)
                 if tick is None:

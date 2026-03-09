@@ -28,6 +28,8 @@ def trade_manager_loop(repo, shutdown_event):
 
             for t in trades:
                 ex, s, tf = t["exchange"], t["symbol"], t["timeframe"]
+                if tf not in TIMEFRAMES:
+                    continue
                 side, trade_id = t["side"], int(t["id"])
 
                 avg_entry = float(t.get("avg_entry") or t.get("entry") or 0)
