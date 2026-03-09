@@ -6,7 +6,9 @@ __pycache__/
 
 # Env
 .env
-
+.env.15m
+.env.1m
+.env.5m
 # Docker
 *.log
 pgdata/

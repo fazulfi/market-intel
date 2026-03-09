@@ -23,11 +23,39 @@ services:
       timeout: 3s
       retries: 5
 
-  app:
+  app-1m:
     build: ./app
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.1m
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tickers.txt:/workspace/tickers.txt:ro
+    command: ["python", "-u", "-m", "app.main"]
+
+  app-5m:
+    build: ./app
+    restart: unless-stopped
+    env_file:
+      - .env.5m
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tickers.txt:/workspace/tickers.txt:ro
+    command: ["python", "-u", "-m", "app.main"]
+
+  app-15m:
+    build: ./app
+    restart: unless-stopped
+    env_file:
+      - .env.15m
     depends_on:
       db:
         condition: service_healthy
