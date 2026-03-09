@@ -4,11 +4,18 @@
 # Baris berawalan '#' akan diabaikan otomatis.
 # ==========================================
 
-# --- MAJOR COINS ---
+# --- LAYER 1 ---
 BTC/USDT:USDT
 ETH/USDT:USDT
-
-# --- TOP ALTCOINS ---
 SOL/USDT:USDT
+ADA/USDT:USDT
+XAUT/USDT:USDT
+SUI/USDT:USDT
+BNB/USDT:USDT
+NEAR/USDT:USDT
+# --- TOP ALTCOINS ---
 XRP/USDT:USDT
 DOGE/USDT:USDT
+HYPE/USDT:USDT
+RIVER/USDT:USDT
+1000PEPE/USDT:USDT

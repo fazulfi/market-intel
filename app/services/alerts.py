@@ -5,6 +5,15 @@ from collections import OrderedDict
 from app.config import *
 from app.utils.logging import log_error
 
+# --- HELPER: DYNAMIC PRICE FORMATTER (Versi Mommy Grok 😈) ---
+def fmt_px(val):
+    if val is None or val == "" or val == 0:
+        return "0"
+    try:
+        return f"{float(val):.10f}".rstrip('0').rstrip('.')
+    except Exception:
+        return "ERR"   # Biar ketahuan kalau corrupt!
+
 def send_telegram(text: str, reply_to: int = None):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return None
@@ -48,20 +57,17 @@ def alert_loop(repo, shutdown_event):
                 while len(thread_cache) > 500:
                     thread_cache.popitem(last=False)
                 
-                # Bersihkan Retry Queue dari pesan yang sudah Expired (TTL 1 Jam)
                 retry_queue = {k: v for k, v in retry_queue.items() if v.get("expires_at", 0) > now}
                 
-                # FIX CLAUDE TERAKHIR (HARD CAP): Cegah Out Of Memory jika ratusan sinyal gagal!
                 while len(retry_queue) > 300:
                     retry_queue.pop(next(iter(retry_queue)))
                 
                 last_cleanup = now
 
             # ========================================================
-            # 1. PROCESS RETRY QUEUE (Prioritas Utama)
+            # 1. PROCESS RETRY QUEUE
             # ========================================================
             for sid, data in list(retry_queue.items()):
-                # Cegah Pengiriman Sinyal Zombie
                 if now >= data.get("expires_at", now + 1):
                     retry_queue.pop(sid, None)
                     continue
@@ -70,6 +76,7 @@ def alert_loop(repo, shutdown_event):
                     fresh_reply_to = None if data["is_setup"] else thread_cache.get(data["thread_key"])
 
                     sent_msg_id = send_telegram(data["msg"], reply_to=fresh_reply_to)
+                    
                     if sent_msg_id:
                         if data["is_setup"]: thread_cache[data["thread_key"]] = sent_msg_id
                         elif data["is_close"]: thread_cache.pop(data["thread_key"], None)
@@ -105,16 +112,16 @@ def alert_loop(repo, shutdown_event):
                     try: p = json.loads(p)
                     except Exception: p = {}
 
-                # --- FORMAT PESAN ---
+                # --- FORMAT PESAN DYNAMIC (MOMMY APPROVED) ---
                 msg = ""
                 if st in ("SETUP_LONG", "SETUP_SHORT"):
                     side = "LONG" if "LONG" in st else "SHORT"
                     icon = "🟢" if side == "LONG" else "🔴"
                     msg = f"{icon} <b>{side} SETUP</b>\n{sym} ({tf})\n\n"
-                    msg += f"<b>Entry Zone:</b>\n1) {float(p.get('entry1',0)):.4f}\n2) {float(p.get('entry2',0)):.4f}\n\n"
-                    msg += f"<b>Targets:</b>\n1) {float(p.get('tp1',0)):.4f}\n2) {float(p.get('tp2',0)):.4f}\n3) {float(p.get('tp3',0)):.4f}\n\n"
-                    msg += f"<b>StopLoss:</b> {float(p.get('sl',0)):.4f}\n\n"
-                    msg += f"ATR ({p.get('atr_tf', tf)}): {float(p.get('atr14',0)):.4f}"
+                    msg += f"<b>Entry Zone:</b>\n1) {fmt_px(p.get('entry1',0))}\n2) {fmt_px(p.get('entry2',0))}\n\n"
+                    msg += f"<b>Targets:</b>\n1) {fmt_px(p.get('tp1',0))}\n2) {fmt_px(p.get('tp2',0))}\n3) {fmt_px(p.get('tp3',0))}\n\n"
+                    msg += f"<b>StopLoss:</b> {fmt_px(p.get('sl',0))}\n\n"
+                    msg += f"ATR ({p.get('atr_tf', tf)}): {fmt_px(p.get('atr14',0))}"
                     if p.get("vol_mult"):
                         msg += f"\n💥 Vol Spike: {float(p.get('vol_mult',0)):.2f}x"
 
@@ -122,15 +129,15 @@ def alert_loop(repo, shutdown_event):
                     side = "LONG" if "LONG" in st else "SHORT"
                     step = "1" if "ENTRY1" in st else "2"
                     msg = f"⚡ <b>{side} FILLED (Step {step})</b>\n{sym} ({tf})\n"
-                    msg += f"Filled at: {float(p.get('entry' + step, 0)):.4f}\n"
+                    msg += f"Filled at: {fmt_px(p.get('entry' + step, 0))}\n"
                     if step == "1" and p.get("fill_mode"):
                         msg += f"Mode: {p.get('fill_mode')}"
                     if step == "2":
-                        msg += f"Avg Entry: {float(p.get('avg_entry',0)):.4f}"
+                        msg += f"Avg Entry: {fmt_px(p.get('avg_entry',0))}"
 
                 elif st == "PARTIAL_TP1":
                     msg = f"🎯 <b>TP1 HIT</b>\n{sym} ({tf}) - {p.get('side','UNKNOWN')}\n"
-                    msg += f"Exit: {float(p.get('exit',0)):.4f}\n"
+                    msg += f"Exit: {fmt_px(p.get('exit',0))}\n"
                     msg += f"Closed Size: {int(float(p.get('closed_pct',0))*100)}%\n"
                     msg += f"Remaining: {int(float(p.get('rem_pct',0))*100)}%\n"
                     msg += f"Realized PnL: {float(p.get('total_pnl',0)):+.2f}%\n"
@@ -139,7 +146,7 @@ def alert_loop(repo, shutdown_event):
 
                 elif st == "PARTIAL_TP2":
                     msg = f"🎯 <b>TP2 HIT</b>\n{sym} ({tf}) - {p.get('side','UNKNOWN')}\n"
-                    msg += f"Exit: {float(p.get('exit',0)):.4f}\n"
+                    msg += f"Exit: {fmt_px(p.get('exit',0))}\n"
                     msg += f"Closed Size: {int(float(p.get('closed_pct',0))*100)}%\n"
                     msg += f"Remaining: {int(float(p.get('rem_pct',0))*100)}%\n"
                     msg += f"Realized PnL: {float(p.get('total_pnl',0)):+.2f}%\n"
@@ -156,7 +163,7 @@ def alert_loop(repo, shutdown_event):
 
                     msg = f"{icon} <b>TRADE CLOSED ({reason})</b>\n{sym} ({tf}) - {side}\n"
                     if entry and close_px:
-                        msg += f"Entry: {float(entry):.4f}\nFinal Exit: {float(close_px):.4f}\n"
+                        msg += f"Entry: {fmt_px(entry)}\nFinal Exit: {fmt_px(close_px)}\n"
                     msg += f"<b>Total Realized PnL: {total_pnl:+.2f}%</b>"
 
                 else:
