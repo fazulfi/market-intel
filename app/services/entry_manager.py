@@ -14,21 +14,23 @@ def _smallest_tf(timeframes):
     return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def entry_manager_loop(repo, shutdown_event):
-    log("EntryManager V2.7 (Strict Momentum Sniper) starting")
+    log("EntryManager V2.8 (DB-Level Isolation) starting")
     fallback_tf = _smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
         try:
             now_ms = int(time.time() * 1000)
 
-            for st in repo.list_pending_setups():
+            # 🚨 FIX GPT: Minta PENDING SETUP yang HANYA milik Timeframe ini (Level DB)
+            for st in repo.list_pending_setups(TIMEFRAMES):
                 setup_id = int(st["id"])
+                
+                # Expiry check sekarang 1000% aman karena data ini PASTI milik bot ini
                 if now_ms > int(st["expires_ts_ms"]):
                     repo.mark_setup_expired(setup_id)
                     continue
 
                 ex, s, tf, side = st["exchange"], st["symbol"], st["timeframe"], st["side"]
-                if tf not in TIMEFRAMES: continue
                 if repo.get_open_trade(ex, s, tf): continue
 
                 payload = st.get("payload") or {}
@@ -50,23 +52,16 @@ def entry_manager_loop(repo, shutdown_event):
                 atr14 = float(st["atr14"])
                 chase_limit = atr14 * ENTRY1_CHASE_ATR_PCT
 
-                # ========================================================
-                # V2.7 STRICT MOMENTUM ENTRY LOGIC
-                # Eksekusi HANYA jika harga (last_px) berada di zona momentum.
-                # Mode menunggu pullback/sentuhan ulang DIHAPUS TOTAL!
-                # ========================================================
                 hit_entry1 = False
                 fill_mode = ""
                 final_fill = entry1
 
                 if side == "LONG":
-                    # Instant Fill: Harga masih di sekitar area breakout
                     if entry1 <= last_px <= (entry1 + chase_limit):
                         hit_entry1 = True
                         fill_mode = "INSTANT_BREAKOUT"
                         final_fill = last_px 
                 else:
-                    # Instant Fill untuk skenario SHORT
                     if entry1 >= last_px >= (entry1 - chase_limit):
                         hit_entry1 = True
                         fill_mode = "INSTANT_BREAKOUT"
@@ -83,13 +78,10 @@ def entry_manager_loop(repo, shutdown_event):
                             "fill_mode": fill_mode
                         })
 
-            # ========================================================
-            # ENTRY 2 LOGIC (Tetap dipertahankan untuk DCA/Averaging)
-            # ========================================================
-            for t in repo.list_open_trades():
+            # 🚨 FIX GPT: Minta OPEN TRADES yang HANYA milik Timeframe ini (Level DB)
+            for t in repo.list_open_trades(TIMEFRAMES):
                 if t.get("filled_entry2") or t.get("entry2") is None: continue
                 ex, s, tf, side, t_id = t["exchange"], t["symbol"], t["timeframe"], t["side"], int(t["id"])
-                if tf not in TIMEFRAMES: continue
 
                 tick = get_tick(s)
                 if tick is None:

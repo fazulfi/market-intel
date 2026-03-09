@@ -118,10 +118,10 @@ class Repo:
             r = conn.execute(sql, (int(closed_ts_ms), float(close_price), str(close_reason), float(final_pnl), bool(hit_tp3), int(trade_id))).fetchone()
             return bool(r)
 
-    def list_open_trades(self):
-        sql = "SELECT * FROM trades WHERE status='OPEN' ORDER BY id ASC;"
+    def list_open_trades(self, tfs: list):
+        sql = "SELECT * FROM trades WHERE status='OPEN' AND timeframe = ANY(%s) ORDER BY id ASC;"
         with self.pool.connection() as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, (tfs,)).fetchall()
             return [dict(r) for r in rows]
 
     # --- V1.7 SUMMARY METHODS ---
@@ -177,10 +177,10 @@ class Repo:
             r = conn.execute(sql, (exchange, symbol, tf, side, int(created_ts_ms), int(expires_ts_ms), float(level), json.dumps(payload))).fetchone()
             return r["id"] if r else None
 
-    def list_pending_setups(self):
-        sql = "SELECT * FROM trade_setups WHERE status='PENDING' ORDER BY id ASC;"
+    def list_pending_setups(self, tfs: list):
+        sql = "SELECT * FROM trade_setups WHERE status='PENDING' AND timeframe = ANY(%s) ORDER BY id ASC;"
         with self.pool.connection() as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, (tfs,)).fetchall()
             return [dict(r) for r in rows]
 
     def mark_setup_triggered(self, setup_id: int):
