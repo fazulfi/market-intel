@@ -13,10 +13,8 @@ def _fmt_stats(title: str, s: dict, open_count: int) -> str:
     be_exits = int(s.get("be_exits", 0) or 0)
     avg_pnl = float(s.get("avg_pnl", 0) or 0)
     sum_pnl = float(s.get("sum_pnl", 0) or 0)
-
     decisive = wins + losses
     wr = (wins / decisive * 100.0) if decisive > 0 else 0.0
-
     msg = []
     msg.append(f"📊 <b>{title}</b>")
     msg.append(f"Closed: {closed} | Win: {wins} | Loss: {losses} | WR: {wr:.1f}%")
@@ -27,11 +25,14 @@ def _fmt_stats(title: str, s: dict, open_count: int) -> str:
     return "\n".join(msg)
 
 def summary_loop(repo, shutdown_event):
-    log("Summary service V2.9 starting")
+    if not ENABLE_SUMMARY:
+        log("Summary disabled for this instance.")
+        return
 
+    log("Summary service V2.9 starting")
     last_hour_key = None
     last_day_key = None
-    last_week_key = None  # V2.9 Kunci Ingatan Mingguan
+    last_week_key = None
 
     while not shutdown_event.is_set():
         try:
@@ -45,20 +46,17 @@ def summary_loop(repo, shutdown_event):
                 last_hour_key = hour_key
 
             day_key = (now.year, now.month, now.day)
-            if (now.hour == SUMMARY_DAILY_HOUR and now.minute == SUMMARY_DAILY_MINUTE and day_key != last_day_key):
+            if now.hour == SUMMARY_DAILY_HOUR and now.minute == SUMMARY_DAILY_MINUTE and day_key != last_day_key:
                 s = repo.fetch_trade_stats_window(86400)
                 send_telegram(_fmt_stats("Daily Summary (last 24h)", s, open_count))
                 last_day_key = day_key
 
-            # ========================================================
-            # V2.9: WEEKLY SUMMARY LOGIC
-            # ========================================================
-            week_key = now.isocalendar()[:2]  # Format: (Tahun, Minggu-ke)
+            week_key = now.isocalendar()[:2]
             if (now.weekday() == SUMMARY_WEEKLY_DAY
                     and now.hour == SUMMARY_WEEKLY_HOUR
                     and now.minute == SUMMARY_WEEKLY_MINUTE
                     and week_key != last_week_key):
-                s = repo.fetch_trade_stats_window(604800)  # 7 Hari = 604800 detik
+                s = repo.fetch_trade_stats_window(604800)
                 send_telegram(_fmt_stats("Weekly Summary (last 7d)", s, open_count))
                 last_week_key = week_key
 
