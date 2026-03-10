@@ -77,6 +77,11 @@ def entry_manager_loop(repo, shutdown_event):
                     
                     order_type = "market" if fill_mode == "INSTANT_BREAKOUT" else "limit"
                     order_res = executor.place_order(s, side, order_type, qty1, final_fill)
+                    # 🛡️ THE FAIL-SAFE: Jangan sentuh DB kalau API exchange gagal!
+                    if not order_res:
+                        log_error("🚨 EXCHANGE ORDER FAILED! Aborting DB Trade Creation.", None)
+                        continue 
+
                     entry1_order_id = order_res.get("id") if isinstance(order_res, dict) else None
 
                     st["avg_entry"] = float(final_fill)
