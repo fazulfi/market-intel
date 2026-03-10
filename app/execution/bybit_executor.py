@@ -92,3 +92,52 @@ class BybitExecutor:
         except Exception as e:
             log_error("Recon Fetch Positions Error", e)
             return None
+
+    def get_available_balance(self, coin: str = "USDT") -> float:
+        """Menyedot saldo riil dari dompet Bybit-mu"""
+        if DRY_RUN:
+            return 1000.0  # Berpura-pura punya modal $1000 USDT saat simulasi!
+        try:
+            bal = self.exchange.fetch_balance()
+            # Ambil saldo 'free' (yang belum terpakai untuk posisi lain)
+            free_bal = float(bal.get(coin, {}).get('free', 0.0))
+            return free_bal
+        except Exception as e:
+            log_error("Fetch Balance Error", e)
+            return 0.0
+
+    def calculate_qty_from_balance(self, symbol: str, entry_price: float, size_pct: float, coin: str = "USDT") -> float:
+        """The True Translator: Mengubah % Saldo menjadi Quantity Koin eksak"""
+        if entry_price <= 0: return 0.0
+        
+        balance = self.get_available_balance(coin)
+        if balance <= 1.0: # Saldo terlalu tipis
+            log(f"⚠️ Insufficient balance to calculate QTY for {symbol}")
+            return 0.0
+            
+        # Hitung Notional Value (Berapa Dolar yang mau dipertaruhkan)
+        # Asumsi size_pct adalah proporsi dari total modal (misal 0.1 = 10% modal)
+        notional_value = balance * size_pct 
+        
+        # Berapa koin yang didapat dari Dolar tersebut?
+        raw_qty = notional_value / entry_price
+        
+        # Format ke presisi Bybit agar tidak kena error invalid_qty!
+        return self.format_qty(symbol, raw_qty)
+
+    def cancel_all_active_orders(self, symbol: str = None) -> bool:
+        """The True Kill Switch Action: Membatalkan semua pending order di Bybit"""
+        target = symbol or "ALL MARKETS"
+        if DRY_RUN:
+            log(f"🛡️ DRY_RUN: Simulated cancellation of all open orders for {target}")
+            return True
+            
+        try:
+            log(f"🚨 EXECUTING MASS CANCEL for {target}...")
+            # CCXT mendukung cancel_all_orders untuk Bybit API V5
+            self.exchange.cancel_all_orders(symbol)
+            log(f"✅ Mass Cancel Successful for {target}!")
+            return True
+        except Exception as e:
+            log_error(f"❌ Mass Cancel Error for {target}", e)
+            return False
