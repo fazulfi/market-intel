@@ -14,7 +14,7 @@ def _to_bybit_symbol(sym: str) -> str:
     s = sym.split(":")[0].replace("/", "")
     return "".join(ch for ch in s if ch.isalnum()).upper()
 
-def BYBIT_WS_PUBLIC_URL -> str:
+def _ws_url() -> str:
     # kita pakai linear buat USDT perpetual/futures
     # sesuai docs: wss://stream.bybit.com/v5/public/linear
     if WS_MARKET_TYPE == "linear":
@@ -26,7 +26,7 @@ def BYBIT_WS_PUBLIC_URL -> str:
     return "wss://stream.bybit.com/v5/public/linear"
 
 async def _run(shutdown_event: threading.Event):
-    url = BYBIT_WS_PUBLIC_URL
+    url = _ws_url()
     args = [f"tickers.{_to_bybit_symbol(s)}" for s in SYMBOLS]
 
     sub = {"op": "subscribe", "args": args}

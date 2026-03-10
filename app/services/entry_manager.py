@@ -1,10 +1,9 @@
 import time
 import json
-from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT, ENTRY1_USD, ENTRY2_USD
+from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
-from app.execution.bybit_executor import BybitExecutor
 
 def _calc_avg_entry(e1, s1, e2, s2):
     total = s1 + s2
@@ -14,7 +13,6 @@ def _calc_avg_entry(e1, s1, e2, s2):
 def entry_manager_loop(repo, shutdown_event):
     log("EntryManager V2.8 (DB-Level Isolation) starting")
     fallback_tf = smallest_tf(TIMEFRAMES)
-    executor = BybitExecutor()
 
     while not shutdown_event.is_set():
         if EMERGENCY_STOP:
@@ -25,11 +23,10 @@ def entry_manager_loop(repo, shutdown_event):
         try:
             now_ms = int(time.time() * 1000)
 
-            # 🚨 FIX GPT: Minta PENDING SETUP yang HANYA milik Timeframe ini (Level DB)
+            # Minta PENDING SETUP yang HANYA milik Timeframe ini (Level DB)
             for st in repo.list_pending_setups(TIMEFRAMES):
                 setup_id = int(st["id"])
                 
-                # Expiry check sekarang 1000% aman karena data ini PASTI milik bot ini
                 if now_ms > int(st["expires_ts_ms"]):
                     repo.mark_setup_expired(setup_id)
                     continue
@@ -72,17 +69,8 @@ def entry_manager_loop(repo, shutdown_event):
                         final_fill = last_px
 
                 if hit_entry1:
-                    # 🚀 WIRING V4.0: Tembak Order $1 (Fixed USD)
-                    qty1 = executor.calc_qty_from_usd(s, final_fill, ENTRY1_USD)
-                    
-                    order_type = "market" if fill_mode == "INSTANT_BREAKOUT" else "limit"
-                    order_res = executor.place_order(s, side, order_type, qty1, final_fill)
-                    # 🛡️ THE FAIL-SAFE: Jangan sentuh DB kalau API exchange gagal!
-                    if not order_res:
-                        log_error("🚨 EXCHANGE ORDER FAILED! Aborting DB Trade Creation.", None)
-                        continue 
-
-                    entry1_order_id = order_res.get("id") if isinstance(order_res, dict) else None
+                    # Ganti eksekusi API dengan Order ID Virtual
+                    entry1_order_id = f"virtual_1_{now_ms}"
 
                     st["avg_entry"] = float(final_fill)
                     trade_id = repo.open_trade_from_setup(st, last_ts)
@@ -94,7 +82,7 @@ def entry_manager_loop(repo, shutdown_event):
                             "fill_mode": fill_mode, "exchange_order_id": entry1_order_id
                         })
 
-            # 🚨 FIX GPT: Minta OPEN TRADES yang HANYA milik Timeframe ini (Level DB)
+            # Minta OPEN TRADES yang HANYA milik Timeframe ini (Level DB)
             for t in repo.list_open_trades(TIMEFRAMES):
                 if t.get("filled_entry2") or t.get("entry2") is None: continue
                 ex, s, tf, side, t_id = t["exchange"], t["symbol"], t["timeframe"], t["side"], int(t["id"])
@@ -110,10 +98,8 @@ def entry_manager_loop(repo, shutdown_event):
 
                 entry1, entry2 = float(t["entry1"]), float(t["entry2"])
                 if (low <= entry2 if side == "LONG" else high >= entry2):
-                    # 🚀 WIRING V4.0: Tembak Order Limit untuk Entry 2 ($2 Fixed USD)
-                    qty2 = executor.calc_qty_from_usd(s, entry2, ENTRY2_USD)
-                    order_res2 = executor.place_order(s, side, "limit", qty2, entry2)
-                    entry2_order_id = order_res2.get("id") if isinstance(order_res2, dict) else None
+                    # Ganti eksekusi API dengan Order ID Virtual
+                    entry2_order_id = f"virtual_2_{now_ms}"
 
                     avg = _calc_avg_entry(entry1, float(t.get("entry1_size") or 0), entry2, float(t.get("entry2_size") or 0))
                     if repo.mark_entry2_filled(t_id, avg):
