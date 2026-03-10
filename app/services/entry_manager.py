@@ -4,6 +4,7 @@ from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
+from app.execution.bybit_executor import BybitExecutor
 
 def _calc_avg_entry(e1, s1, e2, s2):
     total = s1 + s2
@@ -13,6 +14,7 @@ def _calc_avg_entry(e1, s1, e2, s2):
 def entry_manager_loop(repo, shutdown_event):
     log("EntryManager V2.8 (DB-Level Isolation) starting")
     fallback_tf = smallest_tf(TIMEFRAMES)
+    executor = BybitExecutor()
 
     while not shutdown_event.is_set():
         if EMERGENCY_STOP:
@@ -70,6 +72,13 @@ def entry_manager_loop(repo, shutdown_event):
                         final_fill = last_px
 
                 if hit_entry1:
+                    # 🚀 WIRING V4.0: Hitung Qty & Tembak Order!
+                    qty_total = executor.calc_order_qty(s, final_fill, risk_pct=0.02) # 2% Saldo
+                    qty1 = executor.format_qty(s, qty_total * float(st.get("entry1_size", 0.3))) # Ambil 30% nya
+                    
+                    order_type = "market" if fill_mode == "INSTANT_BREAKOUT" else "limit"
+                    executor.place_order(s, side, order_type, qty1, final_fill)
+
                     st["avg_entry"] = float(final_fill)
                     trade_id = repo.open_trade_from_setup(st, last_ts)
                     if trade_id:
@@ -96,6 +105,11 @@ def entry_manager_loop(repo, shutdown_event):
 
                 entry1, entry2 = float(t["entry1"]), float(t["entry2"])
                 if (low <= entry2 if side == "LONG" else high >= entry2):
+                    # 🚀 WIRING V4.0: Tembak Order Limit untuk Entry 2
+                    qty_total = executor.calc_order_qty(s, entry2, risk_pct=0.02)
+                    qty2 = executor.format_qty(s, qty_total * float(t.get("entry2_size", 0.7))) # Ambil 70% nya
+                    executor.place_order(s, side, "limit", qty2, entry2)
+
                     avg = _calc_avg_entry(entry1, float(t.get("entry1_size") or 0), entry2, float(t.get("entry2_size") or 0))
                     if repo.mark_entry2_filled(t_id, avg):
                         repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY2", {"trade_id": t_id, "entry1": entry1, "entry2": entry2, "avg_entry": avg})

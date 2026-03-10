@@ -1,5 +1,5 @@
 import time
-from app.config import DRY_RUN, ENABLE_TRADES, TIMEFRAMES, TP1_CLOSE_PCT, TP2_CLOSE_PCT, MOVE_SL_TO_BE_AFTER_TP1, MOVE_SL_TO_TP1_AFTER_TP2, ENABLE_WS_TICKER, TRADE_MANAGER_INTERVAL_SEC
+from app.config import EMERGENCY_STOP, DRY_RUN, ENABLE_TRADES, TIMEFRAMES, TP1_CLOSE_PCT, TP2_CLOSE_PCT, MOVE_SL_TO_BE_AFTER_TP1, MOVE_SL_TO_TP1_AFTER_TP2, ENABLE_WS_TICKER, TRADE_MANAGER_INTERVAL_SEC
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
@@ -21,6 +21,13 @@ def trade_manager_loop(repo, shutdown_event):
     while not shutdown_event.is_set():
         try:
             now_ms = int(time.time() * 1000)
+
+            # 🛑 THE TRUE KILL SWITCH (MEMBATALKAN ORDER EXCHANGE)
+            if EMERGENCY_STOP:
+                log("🚨 EMERGENCY STOP ACTIVE: Canceling all pending exchange orders!")
+                active_symbols = list(set([tr["symbol"] for tr in repo.list_open_trades(TIMEFRAMES)]))
+                for sym in active_symbols:
+                    executor.cancel_all_orders(sym)
             
             # 🚨 FIX GPT: Menggunakan list_open_trades(TIMEFRAMES) yang disaring DB
             trades = repo.list_open_trades(TIMEFRAMES)

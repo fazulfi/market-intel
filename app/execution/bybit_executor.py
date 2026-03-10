@@ -141,3 +141,33 @@ class BybitExecutor:
         except Exception as e:
             log_error(f"❌ Mass Cancel Error for {target}", e)
             return False
+
+
+    def fetch_balance(self, coin: str = "USDT") -> float:
+        """Menyedot saldo asli dari dompet Bybit"""
+        if DRY_RUN: return 1000.0 # Saldo bohong-bohongan untuk simulasi
+        try:
+            bal = self.exchange.fetch_balance()
+            return float(bal.get('free', {}).get(coin, 0.0))
+        except Exception as e:
+            log_error(f"Fetch Balance Error ({coin})", e)
+            return 0.0
+
+    def calc_order_qty(self, symbol: str, price: float, risk_pct: float = 0.02) -> float:
+        """Menghitung Kuantitas (Lot) berdasarkan 2% (default) dari Saldo USDT"""
+        bal = self.fetch_balance("USDT")
+        notional = bal * risk_pct  # Berapa USDT yang mau dirisikokan
+        if price <= 0: return 0.0
+        raw_qty = notional / price
+        return self.format_qty(symbol, raw_qty)
+
+    def cancel_all_orders(self, symbol: str = None):
+        """Senjata Kill Switch: Membatalkan semua antrean limit/stop di Bybit"""
+        if DRY_RUN:
+            log(f"🛡️ DRY_RUN: Simulated cancel_all_orders for {symbol or 'ALL'}")
+            return
+        try:
+            self.exchange.cancel_all_orders(symbol)
+            log(f"🛑 KILLED ALL PENDING ORDERS for {symbol or 'ALL'} on Bybit!")
+        except Exception as e:
+            log_error("Cancel Orders Error", e)
