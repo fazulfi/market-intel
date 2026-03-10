@@ -119,10 +119,5 @@ MOVE_SL_TO_TP1_AFTER_TP2 = os.getenv("MOVE_SL_TO_TP1_AFTER_TP2", "true").lower()
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 ENABLE_SUMMARY = os.getenv('ENABLE_SUMMARY', 'true').lower() == 'true'
 
-# --- V4.0 EXECUTION LAYER ---
-BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
-BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
-DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"
-
 # --- V4.0 KILL SWITCH ---
 EMERGENCY_STOP = os.getenv('EMERGENCY_STOP', 'false').lower() == 'true'

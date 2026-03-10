@@ -1,10 +1,8 @@
 import time
-from app.config import EMERGENCY_STOP, DRY_RUN, ENABLE_TRADES, TIMEFRAMES, TP1_CLOSE_PCT, TP2_CLOSE_PCT, MOVE_SL_TO_BE_AFTER_TP1, MOVE_SL_TO_TP1_AFTER_TP2, ENABLE_WS_TICKER, TRADE_MANAGER_INTERVAL_SEC
+from app.config import EMERGENCY_STOP, ENABLE_TRADES, TIMEFRAMES, TP1_CLOSE_PCT, TP2_CLOSE_PCT, MOVE_SL_TO_BE_AFTER_TP1, MOVE_SL_TO_TP1_AFTER_TP2, ENABLE_WS_TICKER, TRADE_MANAGER_INTERVAL_SEC
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
-from app.execution.bybit_executor import BybitExecutor
-
 
 def calc_pnl_pct(side: str, entry: float, exit_px: float, size_pct: float) -> float:
     if entry <= 0: return 0.0
@@ -15,44 +13,17 @@ def trade_manager_loop(repo, shutdown_event):
     if not ENABLE_TRADES: return
     log("TradeManager V2.8 (DB-Level Isolation) starting")
     fallback_tf = smallest_tf(TIMEFRAMES)
-    executor = BybitExecutor()
-    last_recon = 0
 
     while not shutdown_event.is_set():
         try:
             now_ms = int(time.time() * 1000)
 
-            # 🛑 THE TRUE KILL SWITCH (MEMBATALKAN ORDER EXCHANGE)
+            # THE VIRTUAL KILL SWITCH
             if EMERGENCY_STOP:
-                log("🚨 EMERGENCY STOP ACTIVE: Canceling all pending exchange orders!")
-                active_symbols = list(set([tr["symbol"] for tr in repo.list_open_trades(TIMEFRAMES)]))
-                for sym in active_symbols:
-                    executor.cancel_all_orders(sym)
+                log("🚨 EMERGENCY STOP ACTIVE: Bot halted in DB!")
             
-            # 🚨 FIX GPT: Menggunakan list_open_trades(TIMEFRAMES) yang disaring DB
+            # Menggunakan list_open_trades(TIMEFRAMES) yang disaring DB
             trades = repo.list_open_trades(TIMEFRAMES)
-
-            # --- 🕵️‍♂️ THE RECON ENGINE (SINKRONISASI BYBIT) ---
-            if not DRY_RUN and (now_ms / 1000 - last_recon) > 60:
-                active_syms = list(set([t["symbol"] for t in trades]))
-                if active_syms:
-                    bybit_positions = executor.fetch_open_positions(active_syms)
-                    if bybit_positions is not None:
-                        for t in trades:
-                            # Beri waktu 3 menit untuk proses Entry pertama kali agar tidak bentrok
-                            if (now_ms - int(t["opened_ts_ms"])) < 180000: continue 
-                            
-                            sym, side, t_id = t["symbol"], t["side"], int(t["id"])
-                            recon_key = f"{sym}_{side}"
-                            
-                            # Jika Bybit bilang KOSONG (0), tapi DB kita bilang OPEN
-                            if bybit_positions.get(recon_key, 0) == 0:
-                                log(f"🚨 RECON ALARM: {sym} {side} missing on Bybit! Force closing in DB.")
-                                if repo.close_trade_v25(t_id, now_ms, float(t.get("avg_entry") or t["entry"]), "EXCHANGE_SYNC", 0.0, hit_tp3=False):
-                                    repo.insert_signal(t["exchange"], sym, t["timeframe"], now_ms, "CLOSE_RECON", {
-                                        "trade_id": t_id, "side": side, "reason": "Desync (Closed externally by Bybit)"
-                                    })
-                last_recon = now_ms / 1000
 
             for t in trades:
                 ex, s, tf = t["exchange"], t["symbol"], t["timeframe"]
