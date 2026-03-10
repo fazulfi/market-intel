@@ -77,7 +77,8 @@ def entry_manager_loop(repo, shutdown_event):
                     qty1 = executor.format_qty(s, qty_total * float(st.get("entry1_size", 0.3))) # Ambil 30% nya
                     
                     order_type = "market" if fill_mode == "INSTANT_BREAKOUT" else "limit"
-                    executor.place_order(s, side, order_type, qty1, final_fill)
+                    order_res = executor.place_order(s, side, order_type, qty1, final_fill)
+                    entry1_order_id = order_res.get("id") if isinstance(order_res, dict) else None
 
                     st["avg_entry"] = float(final_fill)
                     trade_id = repo.open_trade_from_setup(st, last_ts)
@@ -86,7 +87,7 @@ def entry_manager_loop(repo, shutdown_event):
                         repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY1", {
                             "trade_id": trade_id, "entry1": float(final_fill), "sl": float(st["sl"]),
                             "tp1": float(st["tp1"]), "tp2": float(st["tp2"]), "tp3": float(st["tp3"]),
-                            "fill_mode": fill_mode
+                            "fill_mode": fill_mode, "exchange_order_id": entry1_order_id
                         })
 
             # 🚨 FIX GPT: Minta OPEN TRADES yang HANYA milik Timeframe ini (Level DB)
@@ -108,11 +109,12 @@ def entry_manager_loop(repo, shutdown_event):
                     # 🚀 WIRING V4.0: Tembak Order Limit untuk Entry 2
                     qty_total = executor.calc_order_qty(s, entry2, risk_pct=0.02)
                     qty2 = executor.format_qty(s, qty_total * float(t.get("entry2_size", 0.7))) # Ambil 70% nya
-                    executor.place_order(s, side, "limit", qty2, entry2)
+                    order_res2 = executor.place_order(s, side, "limit", qty2, entry2)
+                    entry2_order_id = order_res2.get("id") if isinstance(order_res2, dict) else None
 
                     avg = _calc_avg_entry(entry1, float(t.get("entry1_size") or 0), entry2, float(t.get("entry2_size") or 0))
                     if repo.mark_entry2_filled(t_id, avg):
-                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY2", {"trade_id": t_id, "entry1": entry1, "entry2": entry2, "avg_entry": avg})
+                        repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY2", {"trade_id": t_id, "entry1": entry1, "entry2": entry2, "avg_entry": avg, "exchange_order_id": entry2_order_id})
 
         except Exception as e: log_error("EntryManager ERROR", e)
         shutdown_event.wait(1)
