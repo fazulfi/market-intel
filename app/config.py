@@ -123,3 +123,6 @@ ENABLE_SUMMARY = os.getenv('ENABLE_SUMMARY', 'true').lower() == 'true'
 BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
 BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"
+
+# --- V4.0 KILL SWITCH ---
+EMERGENCY_STOP = os.getenv('EMERGENCY_STOP', 'false').lower() == 'true'

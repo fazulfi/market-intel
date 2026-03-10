@@ -1,5 +1,5 @@
 from statistics import mean
-from app.config import SYMBOLS, TIMEFRAMES, TREND_TF_MAP, ATR_TF_MAP, EMA_TREND_TF, EXCHANGE, EMA_TREND_N, BREAKOUT_N, VOL_AVG_N, VOL_SPIKE_K, ATR_WARMUP, ATR_N, POST_CLOSE_COOLDOWN_BARS, ENTRY1_ATR_OFFSET, ENTRY2_ATR_OFFSET, SL_ATR_MULT, TP1_ATR_MULT, TP2_ATR_MULT, TP3_ATR_MULT, ENTRY1_SIZE, ENTRY2_SIZE, SETUP_EXPIRY_BARS, SIGNAL_INTERVAL_SEC
+from app.config import EMERGENCY_STOP, SYMBOLS, TIMEFRAMES, TREND_TF_MAP, ATR_TF_MAP, EMA_TREND_TF, EXCHANGE, EMA_TREND_N, BREAKOUT_N, VOL_AVG_N, VOL_SPIKE_K, ATR_WARMUP, ATR_N, POST_CLOSE_COOLDOWN_BARS, ENTRY1_ATR_OFFSET, ENTRY2_ATR_OFFSET, SL_ATR_MULT, TP1_ATR_MULT, TP2_ATR_MULT, TP3_ATR_MULT, ENTRY1_SIZE, ENTRY2_SIZE, SETUP_EXPIRY_BARS, SIGNAL_INTERVAL_SEC
 from app.utils.logging import log_error
 
 _TF_SEC = {"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"4h":14400,"1d":86400}
@@ -22,6 +22,11 @@ def calc_atr_wilder(candles, n):
 def signal_loop(repo, shutdown_event):
     need = max(ATR_WARMUP, BREAKOUT_N + 2, VOL_AVG_N + 2, ATR_N + 2)
     while not shutdown_event.is_set():
+        if EMERGENCY_STOP:
+            log("🚨 EMERGENCY STOP ACTIVE: Signal Engine is HALTED! No new setups will be created.")
+            shutdown_event.wait(SIGNAL_INTERVAL_SEC)
+            continue
+            
         try:
             for s in SYMBOLS:
                 for tf in TIMEFRAMES:
