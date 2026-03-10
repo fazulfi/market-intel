@@ -224,7 +224,7 @@ class Repo:
             )).fetchone()
             return r["id"] if r else None
 
-    def mark_entry2_filled(self, trade_id: int, entry2_price: float, avg_entry: float):
+    def mark_entry2_filled(self, trade_id: int, avg_entry: float):
         sql = '''
         UPDATE trades
         SET filled_entry2 = true,

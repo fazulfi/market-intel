@@ -24,5 +24,14 @@ Market Intel is an Enterprise-Grade, event-driven cryptocurrency trading bot arc
 4. Launch the fleet:
    ```bash
    docker compose up -d --build
+
 🛡️ Architecture
 Data Feeder (WS) ➡️ Redis + Postgres ➡️ Signal Engine ➡️ Entry Manager ➡️ Trade Manager ➡️ Telegram Alerts
+
+---
+
+### 🚀 LANGKAH 3: RESTART & COMMIT!
+Karena kita baru saja menambal otak *database*, *restart* mesinnya agar *error* mengerikan tadi hilang:
+
+```bash
+docker compose restart
