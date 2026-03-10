@@ -1,6 +1,6 @@
 import time
 import json
-from app.config import TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
+from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
@@ -15,6 +15,11 @@ def entry_manager_loop(repo, shutdown_event):
     fallback_tf = smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
+        if EMERGENCY_STOP:
+            log("🚨 EMERGENCY STOP ACTIVE: Entry Manager is HALTED! No new entries will be executed.")
+            shutdown_event.wait(10)
+            continue
+            
         try:
             now_ms = int(time.time() * 1000)
 
