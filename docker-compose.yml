@@ -65,9 +65,6 @@ services:
       - ./tickers.txt:/workspace/tickers.txt:ro
     command: ["python", "-u", "-m", "app.main"]
 
-volumes:
-  pgdata:
-
   sniper-1m:
     build: ./sniper
     restart: unless-stopped
@@ -76,3 +73,7 @@ volumes:
     depends_on:
       db:
         condition: service_healthy
+
+volumes:
+  pgdata:
+
