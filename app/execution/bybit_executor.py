@@ -43,10 +43,15 @@ class BybitExecutor:
         formatted_qty = self.format_qty(symbol, qty)
         formatted_price = self.format_price(symbol, price) if price else None
 
+        # 🚀 MAPPING LONG/SHORT TO BUY/SELL
+        ccxt_side = "buy" if side.upper() == "LONG" else "sell"
+        # Kalau ini order Take Profit / Stop Loss (reduce_only), arahnya dibalik!
+        if reduce_only: ccxt_side = "sell" if side.upper() == "LONG" else "buy"
+
         # Log format eksekusi
         mode_str = "DRY_RUN" if DRY_RUN else "LIVE_API"
         px_str = formatted_price if formatted_price else "MARKET"
-        log(f"[{mode_str}] Executing: {order_type} {side} {formatted_qty} {symbol} @ {px_str} (ReduceOnly: {reduce_only})")
+        log(f"[{mode_str}] Executing: {order_type} {ccxt_side.upper()} (Trade: {side}) {formatted_qty} {symbol} @ {px_str} (Reduce: {reduce_only})")
 
         # 🛡️ THE DRY RUN SHIELD 🛡️
         if DRY_RUN:
@@ -59,7 +64,7 @@ class BybitExecutor:
             order = self.exchange.create_order(
                 symbol=symbol,
                 type=order_type,
-                side=side,
+                side=ccxt_side,
                 amount=formatted_qty,
                 price=formatted_price,
                 params=params
@@ -171,3 +176,9 @@ class BybitExecutor:
             log(f"🛑 KILLED ALL PENDING ORDERS for {symbol or 'ALL'} on Bybit!")
         except Exception as e:
             log_error("Cancel Orders Error", e)
+
+    def calc_qty_from_usd(self, symbol: str, price: float, usd_amount: float) -> float:
+        """Menghitung Lot Size murni berdasarkan nominal USD tetap ($1 / $2)"""
+        if price <= 0: return 0.0
+        raw_qty = usd_amount / price
+        return self.format_qty(symbol, raw_qty)
