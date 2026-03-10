@@ -11,27 +11,22 @@ Market Intel is an Enterprise-Grade, event-driven cryptocurrency trading bot arc
 
 ## 🛠️ Tech Stack
 - **Engine:** Python 3.12-slim
-- **Database:** PostgreSQL (for persisting candles, setups, trades, and signals)
-- **Cache:** Redis (for live tick data and lightning-fast inter-process state)
+- **Database:** PostgreSQL
+- **Cache:** Redis
+- **Testing:** Pytest
 - **Deployment:** Docker & Docker Compose
 
 ## 🚀 Quick Start
 1. Clone the repository.
-2. Setup your Environment Variables using the provided templates:
-   - `cp .env.template.feeder .env.1m`
-   - `cp .env.template.worker .env.5m`
-3. Edit the `.env` files with your Bybit API Keys and Telegram credentials.
+2. Setup your Environment Variables:
+   ```
+   cp .env.template.feeder .env.1m
+   cp .env.template.worker .env.5m```
+3. Edit the .env files with your Bybit API Keys and Telegram credentials.
+
 4. Launch the fleet:
-   ```bash
-   docker compose up -d --build
+   ```
+   docker compose up -d --build```
 
 🛡️ Architecture
 Data Feeder (WS) ➡️ Redis + Postgres ➡️ Signal Engine ➡️ Entry Manager ➡️ Trade Manager ➡️ Telegram Alerts
-
----
-
-### 🚀 LANGKAH 3: RESTART & COMMIT!
-Karena kita baru saja menambal otak *database*, *restart* mesinnya agar *error* mengerikan tadi hilang:
-
-```bash
-docker compose restart
