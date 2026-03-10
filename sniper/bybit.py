@@ -30,32 +30,60 @@ class SniperBybit:
         except Exception as e:
             _log(f"Gagal load market: {e}")
 
-    def get_market_limits(self, symbol: str) -> Tuple[float, float]:
-        """Mengambil (min_amount, amount_step) dari aturan Bybit"""
-        if not self.markets_loaded: self.load_markets()
+    def get_market_min_amount(self, symbol: str) -> float:
+        """Mengambil batas minimum lot dari bursa dengan lebih akurat."""
+        if not self.markets_loaded:
+            self.load_markets()
         market = self.markets_info.get(symbol)
-        if not market: return 0.0, 0.0
+        if not market:
+            return 0.0
+        return float(market.get('limits', {}).get('amount', {}).get('min', 0.0))
+
+    def set_max_leverage(self, symbol: str) -> int:
+        """Mencari leverage maksimal yang diizinkan bursa dan mengesetnya."""
+        if not self.markets_loaded:
+            self.load_markets()
+        market = self.markets_info.get(symbol)
         
-        min_amount = float(market.get('limits', {}).get('amount', {}).get('min', 0.0))
-        step = float(market.get('precision', {}).get('amount', 0.0))
-        return min_amount, step
+        max_lev = 1
+        if market:
+            max_lev = int(market.get('limits', {}).get('leverage', {}).get('max', 1))
+        
+        try:
+            # Mengatur leverage ke Bybit secara eksplisit
+            self.exchange.set_leverage(max_lev, symbol)
+            _log(f"Leverage {symbol} diset ke maksimal: {max_lev}x")
+            return max_lev
+        except Exception as e:
+            # Pengecualian biasanya terjadi jika leverage sudah di angka tersebut
+            _log(f"Info set leverage {symbol}: {e}")
+            return max_lev
 
     def format_qty(self, symbol: str, qty: float) -> float:
         """Memotong angka desimal sesuai presisi bursa"""
-        if not self.markets_loaded: self.load_markets()
-        if symbol not in self.markets_info: return qty
+        if not self.markets_loaded:
+            self.load_markets()
+        if symbol not in self.markets_info:
+            return qty
         return float(self.exchange.amount_to_precision(symbol, qty))
 
     def get_current_price(self, symbol: str) -> float:
+        """Mengambil harga 'last' secara aman dengan validasi."""
         ticker = self.exchange.fetch_ticker(symbol)
-        return float(ticker['last'])
+        last = ticker.get("last")
+        if last is None or float(last) <= 0:
+            raise ValueError(f"Harga live tidak valid untuk {symbol}: {ticker}")
+        return float(last)
 
     def place_market_order(self, symbol: str, side: str, qty: float, reduce_only: bool = False) -> Optional[str]:
         formatted_qty = self.format_qty(symbol, qty)
-        min_amount, _ = self.get_market_limits(symbol)
+        min_amount = self.get_market_min_amount(symbol)
         
-        # 🛡️ THE MINIMUM LOT SHIELD
-        if formatted_qty < min_amount:
+        # 🛡️ THE MINIMUM LOT SHIELD & VALIDATION
+        if formatted_qty <= 0:
+            raise ValueError(f"DITOLAK: Kuantitas {formatted_qty} tidak valid setelah formatting")
+
+        if min_amount > 0 and formatted_qty < min_amount:
             raise ValueError(f"DITOLAK: Kuantitas {formatted_qty} lebih kecil dari minimum lot bursa ({min_amount})")
 
         _log(f"EXECUTING: MARKET {side.upper()} | {formatted_qty} {symbol} | Reduce: {reduce_only}")
@@ -78,18 +106,18 @@ class SniperBybit:
             raise e
 
     def get_position_size(self, symbol: str, side: str) -> float:
-        """Cek posisi aktif saat ini untuk keperluan Partial TP / Close"""
+        """Cek posisi aktif saat ini secara defensif."""
         try:
-            # Normalisasi side ke bentuk standar ccxt
             target_side = "long" if side.upper() == "LONG" else "short"
-            
             positions = self.exchange.fetch_positions([symbol])
+            
             for p in positions:
-                pos_side = str(p.get('side', '')).lower()
-                # Tarik size dari berbagai kemungkinan response
-                pos_size = float(p.get('contracts', 0) or p.get('info', {}).get('size', 0))
+                pos_symbol = str(p.get("symbol", ""))
+                pos_side = str(p.get("side", "")).lower()
+                pos_size = float(p.get("contracts", 0) or p.get("info", {}).get("size", 0))
                 
-                if p['symbol'] == symbol and pos_side == target_side:
+                # 🛡️ Validasi ekstra defensif
+                if pos_symbol == symbol and pos_side == target_side and pos_size > 0:
                     return pos_size
             return 0.0
         except Exception as e:
