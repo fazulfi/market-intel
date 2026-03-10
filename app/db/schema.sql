@@ -114,3 +114,38 @@ ON trade_setups(exchange, symbol, timeframe)
 WHERE status = 'PENDING';
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry1_order_id TEXT;
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry2_order_id TEXT;
+
+-- =========================================================
+-- SNIPER V2: anti-double execution + query performance
+-- Tambahkan ke app/db/schema.sql
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS executed_signals (
+  signal_id BIGINT PRIMARY KEY,
+  sniper_name TEXT NOT NULL,
+  exchange TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  timeframe TEXT NOT NULL,
+  signal_type TEXT NOT NULL,
+  action TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED', 'SKIPPED')),
+  exchange_order_id TEXT,
+  error_msg TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  executed_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS executed_signals_lookup_idx
+  ON executed_signals (timeframe, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS executed_signals_symbol_idx
+  ON executed_signals (symbol, timeframe, created_at DESC);
+
+-- Index khusus buat sniper polling per-TF + incremental by id
+CREATE INDEX IF NOT EXISTS signals_sniper_tf_id_idx
+  ON signals (timeframe, id);
+
+-- Optional tapi sangat membantu kalau sniper hanya konsumsi event-event aksi
+CREATE INDEX IF NOT EXISTS signals_sniper_action_idx
+  ON signals (timeframe, signal_type, id);

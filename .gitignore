@@ -9,6 +9,9 @@ __pycache__/
 .env.15m
 .env.1m
 .env.5m
+.env.sniper.1m
+.env.sniper.5m
+.env.sniper.15m
 # Docker
 *.log
 pgdata/

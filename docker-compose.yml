@@ -67,3 +67,12 @@ services:
 
 volumes:
   pgdata:
+
+  sniper-1m:
+    build: ./sniper
+    restart: unless-stopped
+    env_file:
+      - .env.sniper.1m
+    depends_on:
+      db:
+        condition: service_healthy
