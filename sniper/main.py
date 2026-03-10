@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import ccxt
 from sniper.db import SniperRepo
 from sniper.bybit import SniperBybit
 
@@ -11,7 +12,6 @@ def main():
     timeframe = os.getenv("SNIPER_TIMEFRAME", "1m")
     sniper_name = os.getenv("SNIPER_NAME", f"sniper-{timeframe}")
     
-    # PERUBAHAN NAMA: Lebih akurat secara trading
     max_notional_usd = float(os.getenv("MAX_NOTIONAL_USD", "2.0"))  
     
     _log(f"🔥 {sniper_name} STARTING! Memantau sinyal {timeframe}. Max Notional: ${max_notional_usd}")
@@ -51,6 +51,9 @@ def main():
                         trade_side = "LONG" if "LONG" in action else "SHORT"
                         ccxt_side = "buy" if trade_side == "LONG" else "sell"
                         
+                        # Set leverage maksimum sebelum eksekusi order
+                        bybit.set_max_leverage(symbol)
+
                         current_px = bybit.get_current_price(symbol)
                         raw_qty = max_notional_usd / current_px
                         
@@ -61,18 +64,25 @@ def main():
                         trade_side = payload.get("side", "LONG")
                         ccxt_side = "sell" if trade_side == "LONG" else "buy"
                         
-                        close_pct = float(payload.get("closed_pct", 0.3)) 
+                        # 🛡️ Mencegah persentase konyol
+                        close_pct = float(payload.get("closed_pct", 0.3))
+                        close_pct = max(0.0, min(close_pct, 1.0))
+                        
                         current_pos_size = bybit.get_position_size(symbol, trade_side)
                         
                         if current_pos_size > 0:
                             qty_to_close = current_pos_size * close_pct
-                            min_amount, _ = bybit.get_market_limits(symbol)
+                            min_amount = bybit.get_market_min_amount(symbol)
                             formatted_qty = bybit.format_qty(symbol, qty_to_close)
                             
                             # 🛡️ THE DUST FILTER
-                            if formatted_qty < min_amount:
-                                _log(f"⚠️ Dust Detected: {formatted_qty} < {min_amount}. Diubah menjadi FULL CLOSE agar posisi tidak nyangkut.")
-                                qty_to_close = current_pos_size # Paksa jual semua
+                            if formatted_qty <= 0:
+                                repo.mark_skipped(sig["id"], "Qty partial close menjadi 0 setelah precision formatting")
+                                continue
+
+                            if min_amount > 0 and formatted_qty < min_amount:
+                                _log(f"⚠️ Dust Detected: {formatted_qty} < {min_amount}. Diubah menjadi FULL CLOSE agar tidak nyangkut.")
+                                qty_to_close = current_pos_size
                                 
                             order_id = bybit.place_market_order(symbol, ccxt_side, qty_to_close, reduce_only=True)
                         else:
@@ -96,14 +106,16 @@ def main():
                     if order_id:
                         repo.mark_success(sig["id"], exchange_order_id=order_id)
 
+                # 🛡️ Error Handling yang dipisah berdasarkan tingkat kronis
                 except ValueError as ve:
-                    # Gagal karena aturan bursa (Lot terlalu kecil, dll)
                     _log(f"Terminal Error: {ve}")
-                    repo.mark_failed(sig["id"], str(ve))
+                    repo.mark_failed(sig["id"], f"TERMINAL: {ve}")
+                except (ccxt.NetworkError, ccxt.ExchangeError) as ce:
+                    _log(f"API/Network Error: {ce}")
+                    repo.mark_failed(sig["id"], f"RETRYABLE_CANDIDATE: {ce}")
                 except Exception as e:
-                    # Gagal karena API/Network
-                    _log(f"API Error: {e}")
-                    repo.mark_failed(sig["id"], str(e))
+                    _log(f"Unknown Error: {e}")
+                    repo.mark_failed(sig["id"], f"TERMINAL: {e}")
 
         except Exception as e:
             _log(f"Error di loop utama: {e}")
