@@ -112,3 +112,5 @@ CREATE TABLE IF NOT EXISTS trade_setups (
 CREATE UNIQUE INDEX IF NOT EXISTS one_pending_setup_per_pair
 ON trade_setups(exchange, symbol, timeframe)
 WHERE status = 'PENDING';
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry1_order_id TEXT;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry2_order_id TEXT;
