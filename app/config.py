@@ -97,8 +97,8 @@ def _csv_fallback(name, fallback):
 
 WS_KLINE_TIMEFRAMES = _csv_fallback("WS_KLINE_TIMEFRAMES", ["1m", "5m", "15m", "1h"])
 
-ENTRY1_SIZE = float(os.getenv("ENTRY1_SIZE", 0.30))
-ENTRY2_SIZE = float(os.getenv("ENTRY2_SIZE", 0.70))
+ENTRY1_USD = float(os.getenv("ENTRY1_USD", 1.0))
+ENTRY2_USD = float(os.getenv("ENTRY2_USD", 2.0))
 POST_CLOSE_COOLDOWN_BARS = int(os.getenv("POST_CLOSE_COOLDOWN_BARS", 6))
 
 TP1_ATR_MULT = float(os.getenv("TP1_ATR_MULT", 1.0))

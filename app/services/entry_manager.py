@@ -1,6 +1,6 @@
 import time
 import json
-from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
+from app.config import EMERGENCY_STOP, TIMEFRAMES, ENTRY1_CHASE_ATR_PCT, ENTRY1_USD, ENTRY2_USD
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
@@ -72,9 +72,8 @@ def entry_manager_loop(repo, shutdown_event):
                         final_fill = last_px
 
                 if hit_entry1:
-                    # 🚀 WIRING V4.0: Hitung Qty & Tembak Order!
-                    qty_total = executor.calc_order_qty(s, final_fill, risk_pct=0.02) # 2% Saldo
-                    qty1 = executor.format_qty(s, qty_total * float(st.get("entry1_size", 0.3))) # Ambil 30% nya
+                    # 🚀 WIRING V4.0: Tembak Order $1 (Fixed USD)
+                    qty1 = executor.calc_qty_from_usd(s, final_fill, ENTRY1_USD)
                     
                     order_type = "market" if fill_mode == "INSTANT_BREAKOUT" else "limit"
                     order_res = executor.place_order(s, side, order_type, qty1, final_fill)
@@ -106,9 +105,8 @@ def entry_manager_loop(repo, shutdown_event):
 
                 entry1, entry2 = float(t["entry1"]), float(t["entry2"])
                 if (low <= entry2 if side == "LONG" else high >= entry2):
-                    # 🚀 WIRING V4.0: Tembak Order Limit untuk Entry 2
-                    qty_total = executor.calc_order_qty(s, entry2, risk_pct=0.02)
-                    qty2 = executor.format_qty(s, qty_total * float(t.get("entry2_size", 0.7))) # Ambil 70% nya
+                    # 🚀 WIRING V4.0: Tembak Order Limit untuk Entry 2 ($2 Fixed USD)
+                    qty2 = executor.calc_qty_from_usd(s, entry2, ENTRY2_USD)
                     order_res2 = executor.place_order(s, side, "limit", qty2, entry2)
                     entry2_order_id = order_res2.get("id") if isinstance(order_res2, dict) else None
 
