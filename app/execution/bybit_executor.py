@@ -69,3 +69,26 @@ class BybitExecutor:
         except Exception as e:
             log_error(f"❌ Order Failed: {symbol}", e)
             return None
+
+    def fetch_open_positions(self, symbols: list) -> dict:
+        """Tahap 3: Recon Engine - Menyedot posisi aktif di Bybit"""
+        if DRY_RUN:
+            return None  # Bypass Recon saat mode Dry Run / Simulasi
+            
+        try:
+            if not symbols: return {}
+            positions = self.exchange.fetch_positions(symbols)
+            pos_map = {}
+            for p in positions:
+                sym = p.get('symbol')
+                # CCXT menyimpan ukuran kontrak di 'contracts' atau 'positionAmt'
+                size = float(p.get('contracts', 0) or p.get('positionAmt', 0) or 0)
+                side = p.get('side', '').upper()
+                
+                # Hanya simpan posisi yang ukurannya lebih dari 0
+                if size > 0:
+                    pos_map[f"{sym}_{side}"] = size
+            return pos_map
+        except Exception as e:
+            log_error("Recon Fetch Positions Error", e)
+            return None
