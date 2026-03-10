@@ -3,19 +3,16 @@ import json
 from app.config import *
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
+from app.utils.timeframes import smallest_tf
 
 def _calc_avg_entry(e1, s1, e2, s2):
     total = s1 + s2
     return ((e1 * s1) + (e2 * s2)) / total if total > 0 else e1
 
-def _smallest_tf(timeframes):
-    tf_sec = {"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"4h":14400,"1d":86400}
-    xs = [tf for tf in (timeframes or []) if tf in tf_sec]
-    return min(xs, key=lambda t: tf_sec[t]) if xs else "1m"
 
 def entry_manager_loop(repo, shutdown_event):
     log("EntryManager V2.8 (DB-Level Isolation) starting")
-    fallback_tf = _smallest_tf(TIMEFRAMES)
+    fallback_tf = smallest_tf(TIMEFRAMES)
 
     while not shutdown_event.is_set():
         try:
