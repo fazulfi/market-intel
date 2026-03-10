@@ -1,30 +1,28 @@
-# Market Intel Engine
+# Market Intel Bot V3.5 (Multi-Instance Edition) 🚀
 
-Event-driven crypto market intelligence system.
+Market Intel is an Enterprise-Grade, event-driven cryptocurrency trading bot architecture. Built to handle layered setups, partial take-profits, and strict multi-instance isolation using Docker.
 
-## Features
+## 🌟 Key Features
+- **Multi-Instance Architecture:** Deploy `Feeder` (Data Collector) and multiple `Worker` (Strategy Executors) independently.
+- **Smart Timeframe Isolation:** DB-level filtering to prevent cross-contamination between 1m, 5m, and 15m instances.
+- **Layered Entry & TP:** Supports 2-step entries and 3-step Take Profits with dynamic Stop-Loss movement (Break-Even protection).
+- **Hybrid Market Data:** Combines Bybit WebSocket (Klines + Ticker) with a blazing-fast Redis in-memory cache.
+- **Telegram Routing:** Decentralized reporting. Route alerts to specific Timeframe Channels and weekly summaries to Private Chat.
 
-- Breakout detection
-- Volume spike detection
-- Multi-symbol support
-- Multi-timeframe support
-- PostgreSQL storage
-- Dockerized deployment
+## 🛠️ Tech Stack
+- **Engine:** Python 3.12-slim
+- **Database:** PostgreSQL (for persisting candles, setups, trades, and signals)
+- **Cache:** Redis (for live tick data and lightning-fast inter-process state)
+- **Deployment:** Docker & Docker Compose
 
-## Architecture
-
-Collector → DB → Signal Engine → Alerts
-
-## Stack
-
-- Python 3.11
-- PostgreSQL 16
-- Docker Compose
-- CCXT
-
-## Version
-
-v1.3.0
-
-Initial stable foundation release.
-# market-intel
+## 🚀 Quick Start
+1. Clone the repository.
+2. Setup your Environment Variables using the provided templates:
+   - `cp .env.template.feeder .env.1m`
+   - `cp .env.template.worker .env.5m`
+3. Edit the `.env` files with your Bybit API Keys and Telegram credentials.
+4. Launch the fleet:
+   ```bash
+   docker compose up -d --build
+🛡️ Architecture
+Data Feeder (WS) ➡️ Redis + Postgres ➡️ Signal Engine ➡️ Entry Manager ➡️ Trade Manager ➡️ Telegram Alerts

@@ -1,6 +1,6 @@
 import time
 import json
-from app.config import *
+from app.config import TIMEFRAMES, ENTRY1_CHASE_ATR_PCT
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
@@ -92,7 +92,7 @@ def entry_manager_loop(repo, shutdown_event):
                 entry1, entry2 = float(t["entry1"]), float(t["entry2"])
                 if (low <= entry2 if side == "LONG" else high >= entry2):
                     avg = _calc_avg_entry(entry1, float(t.get("entry1_size") or 0), entry2, float(t.get("entry2_size") or 0))
-                    if repo.mark_entry2_filled(t_id, entry2, avg):
+                    if repo.mark_entry2_filled(t_id, avg):
                         repo.insert_signal(ex, s, tf, last_ts, f"FILL_{side}_ENTRY2", {"trade_id": t_id, "entry1": entry1, "entry2": entry2, "avg_entry": avg})
 
         except Exception as e: log_error("EntryManager ERROR", e)
