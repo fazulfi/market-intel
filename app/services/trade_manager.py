@@ -1,5 +1,5 @@
 import time
-from app.config import *
+from app.config import ENABLE_TRADES, TIMEFRAMES, TP1_CLOSE_PCT, TP2_CLOSE_PCT, MOVE_SL_TO_BE_AFTER_TP1, MOVE_SL_TO_TP1_AFTER_TP2, ENABLE_WS_TICKER, TRADE_MANAGER_INTERVAL_SEC
 from app.utils.logging import log, log_error
 from app.utils.memory import get_tick
 from app.utils.timeframes import smallest_tf
