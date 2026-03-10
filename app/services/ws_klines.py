@@ -21,8 +21,7 @@ async def klines_loop(shutdown_event):
     if not ENABLE_WS_KLINES: return
     repo = Repo()
     topics = [f"kline.{tf_to_bybit(tf)}.{ccxt_symbol_to_bybit(sym)}" for sym in SYMBOLS for tf in WS_KLINE_TIMEFRAMES]
-    sub_msg = {"op": "subscribe", "args": topics}
-
+    
     log(f"WS_KLINES starting, topics={len(topics)}")
 
     while not shutdown_event.is_set():
@@ -30,14 +29,17 @@ async def klines_loop(shutdown_event):
             async with websockets.connect(BYBIT_WS_PUBLIC_URL, ping_interval=20) as ws:
                 for i in range(0, len(topics), 25):
                     await ws.send(json.dumps({"op": "subscribe", "args": topics[i:i+25]}))
-                    import asyncio
                     await asyncio.sleep(0.1)
                 log(f"WS_KLINES subscribed to {len(topics)} topics in batches")
 
                 while not shutdown_event.is_set():
-                    raw = await ws.recv()
-                    msg = json.loads(raw)
+                    try:
+                        # 🚨 FIX GPT: Tambahkan timeout agar tidak hang saat shutdown!
+                        raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        continue
 
+                    msg = json.loads(raw)
                     topic = msg.get("topic", "")
                     if not topic.startswith("kline."): continue
 
@@ -55,7 +57,6 @@ async def klines_loop(shutdown_event):
 
                     for k in data:
                         if k.get("confirm") is not True: continue
-
                         ts_ms = int(k.get("start") or k.get("t") or 0)
                         if not ts_ms: continue
                         if ts_ms < 10_000_000_000: ts_ms *= 1000
@@ -65,8 +66,9 @@ async def klines_loop(shutdown_event):
                             await asyncio.to_thread(repo.upsert_candles, EXCHANGE, sym, tf, [[ts_ms, o, h, l, c, v]])
                         except Exception: continue
         except Exception as e:
-            log_error("WS_KLINES ERROR", e)
-            await asyncio.sleep(3)
+            if not shutdown_event.is_set():
+                log_error("WS_KLINES ERROR", e)
+                await asyncio.sleep(3)
 
 def start_ws_klines(shutdown_event):
     try: asyncio.run(klines_loop(shutdown_event))
