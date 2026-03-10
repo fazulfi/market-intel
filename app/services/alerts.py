@@ -2,7 +2,7 @@ import time
 import json
 import requests
 from collections import OrderedDict
-from app.config import *
+from app.config import TELEGRAM_CHAT_ID, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, ALERT_COOLDOWN_SEC, TIMEFRAMES
 from app.utils.logging import log_error
 
 # --- HELPER: DYNAMIC PRICE FORMATTER ---

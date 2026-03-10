@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from app.config import *
+from app.config import ENABLE_SUMMARY, TIMEFRAMES, SUMMARY_HOURLY_MINUTE, SUMMARY_DAILY_HOUR, SUMMARY_DAILY_MINUTE, SUMMARY_WEEKLY_DAY, SUMMARY_WEEKLY_HOUR, SUMMARY_WEEKLY_MINUTE, TELEGRAM_CHANNEL_ID
 from app.utils.logging import log_error, log
 from app.services.alerts import send_telegram
 
