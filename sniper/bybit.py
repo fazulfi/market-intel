@@ -92,10 +92,18 @@ class SniperBybit:
             self._leverage_cache[symbol] = leverage
             _log(f"Leverage {symbol} diset ke {leverage}x")
             return leverage
+
         except Exception as e:
+            msg = str(e)
+
+        # Bybit 110043 = leverage sudah sama / tidak berubah
+            if "110043" in msg or "not modified" in msg.lower():
+                self._leverage_cache[symbol] = leverage
+                _log(f"Leverage {symbol} sudah {leverage}x, lanjut eksekusi")
+                return leverage
+
             _log(f"Gagal set leverage {symbol} ke {leverage}x: {e}")
             raise
-
     def resolve_entry_leverage(self, symbol: str) -> int:
         use_max_leverage = os.getenv("USE_MAX_LEVERAGE", "false").lower() == "true"
         target_leverage = int(os.getenv("TARGET_LEVERAGE", "1"))

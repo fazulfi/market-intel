@@ -65,15 +65,6 @@ services:
       - ./tickers.txt:/workspace/tickers.txt:ro
     command: ["python", "-u", "-m", "app.main"]
 
-  sniper-1m:
-    build: ./sniper
-    restart: unless-stopped
-    env_file:
-      - .env.sniper.1m
-    depends_on:
-      db:
-        condition: service_healthy
-
 volumes:
   pgdata:
 

@@ -34,8 +34,8 @@ COLLECTOR_INTERVAL_SEC = int(os.getenv("COLLECTOR_INTERVAL_SEC", 20))
 SIGNAL_INTERVAL_SEC = int(os.getenv("SIGNAL_INTERVAL_SEC", 5))
 HEARTBEAT_INTERVAL_SEC = int(os.getenv("HEARTBEAT_INTERVAL_SEC", 60))
 
-BREAKOUT_N = int(os.getenv("BREAKOUT_N", 20))
-VOL_AVG_N = int(os.getenv("VOL_AVG_N", 20))
+BREAKOUT_N = int(os.getenv("BREAKOUT_N", 40))
+VOL_AVG_N = int(os.getenv("VOL_AVG_N", 40))
 VOL_SPIKE_K = float(os.getenv("VOL_SPIKE_K", 2.5))
 
 BACKFILL_ON_START = os.getenv("BACKFILL_ON_START", "false").lower() == "true"
